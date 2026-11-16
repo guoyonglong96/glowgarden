@@ -22,6 +22,42 @@ const tufts = [];
     tufts.push({ x: rnd() * VIEW.width, y: HUD_H + 20 + rnd() * (SHOP_Y - HUD_H - 40), s: 0.7 + rnd() * 0.9, hue: rnd() });
   }
 }
+// Glowing mushrooms and night flowers, seeded off the path so they
+// never cover the road. They fill the empty garden with living light.
+const shrooms = [];
+{
+  const rnd = mulberry32(5150);
+  const caps = ['#7dd7ff', '#ff9ecf', '#b9a7ff', '#8ef7c1'];
+  for (let i = 0; i < 12; i += 1) {
+    const x = 40 + rnd() * (VIEW.width - 80);
+    const y = HUD_H + 40 + rnd() * (SHOP_Y - HUD_H - 80);
+    if (nearPath(x, y, 52)) continue;
+    shrooms.push({ x: x, y: y, r: 5 + rnd() * 5, cap: caps[Math.floor(rnd() * caps.length)], ph: rnd() * Math.PI * 2 });
+  }
+}
+const blooms = [];
+{
+  const rnd = mulberry32(90210);
+  const petals = ['#ff9ecf', '#c9a7ff', '#ffd76b', '#ff8fb0'];
+  for (let i = 0; i < 10; i += 1) {
+    const x = 40 + rnd() * (VIEW.width - 80);
+    const y = HUD_H + 40 + rnd() * (SHOP_Y - HUD_H - 80);
+    if (nearPath(x, y, 58)) continue;
+    blooms.push({ x: x, y: y, r: 5 + rnd() * 4, col: petals[Math.floor(rnd() * petals.length)], ph: rnd() * Math.PI * 2 });
+  }
+}
+function nearPath(x, y, pad) {
+  for (let i = 0; i < PATH.length - 1; i += 1) {
+    const a = PATH[i], b = PATH[i + 1];
+    const dx = b.x - a.x, dy = b.y - a.y;
+    const len2 = dx * dx + dy * dy;
+    let t = len2 === 0 ? 0 : ((x - a.x) * dx + (y - a.y) * dy) / len2;
+    t = Math.max(0, Math.min(1, t));
+    const px = a.x + dx * t, py = a.y + dy * t;
+    if (Math.hypot(x - px, y - py) < pad) return true;
+  }
+  return false;
+}
 
 export function uiLayout(game) {
   const cards = TOWER_ORDER.map(function (kind, i) {
@@ -68,6 +104,12 @@ function drawBackground(ctx, game) {
   heart.addColorStop(1, 'rgba(255, 190, 90, 0)');
   ctx.fillStyle = heart;
   ctx.fillRect(0, 0, VIEW.width, VIEW.height);
+  // Moonlight from the top-left, a cool counterweight to the warm heart.
+  const moon = ctx.createRadialGradient(150, 40, 10, 150, 40, 420);
+  moon.addColorStop(0, 'rgba(180, 210, 255, 0.10)');
+  moon.addColorStop(1, 'rgba(180, 210, 255, 0)');
+  ctx.fillStyle = moon;
+  ctx.fillRect(0, 0, VIEW.width, VIEW.height);
   // Stars, gently twinkling.
   for (let i = 0; i < stars.length; i += 1) {
     const s = stars[i];
@@ -75,6 +117,38 @@ function drawBackground(ctx, game) {
     ctx.globalAlpha = a;
     ctx.fillStyle = '#cfe8ff';
     ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+  // Glowing mushrooms: a soft halo, a pale stem, a coloured cap.
+  for (let i = 0; i < shrooms.length; i += 1) {
+    const m = shrooms[i];
+    const pulse = 0.55 + 0.25 * Math.sin(game.time * 1.8 + m.ph);
+    ctx.globalAlpha = pulse * 0.35;
+    ctx.fillStyle = m.cap;
+    ctx.beginPath(); ctx.arc(m.x, m.y - 4, m.r * 2.1, 0, Math.PI * 2); ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = '#e8f5ee';
+    ctx.fillRect(m.x - 1.5, m.y - 4, 3, 7);
+    ctx.fillStyle = m.cap;
+    ctx.beginPath(); ctx.arc(m.x, m.y - 5, m.r, Math.PI, 0); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.75)';
+    ctx.beginPath(); ctx.arc(m.x - m.r * 0.35, m.y - 5 - m.r * 0.4, 1.2, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(m.x + m.r * 0.3, m.y - 5 - m.r * 0.2, 1, 0, Math.PI * 2); ctx.fill();
+  }
+  // Night flowers: five glowing petals around a bright heart.
+  for (let i = 0; i < blooms.length; i += 1) {
+    const b = blooms[i];
+    const pulse = 0.6 + 0.3 * Math.sin(game.time * 2.2 + b.ph);
+    ctx.globalAlpha = pulse * 0.3;
+    ctx.fillStyle = b.col;
+    ctx.beginPath(); ctx.arc(b.x, b.y, b.r * 2.4, 0, Math.PI * 2); ctx.fill();
+    ctx.globalAlpha = pulse;
+    for (let p = 0; p < 5; p += 1) {
+      const a = (p / 5) * Math.PI * 2 + b.ph;
+      ctx.beginPath(); ctx.arc(b.x + Math.cos(a) * b.r * 0.75, b.y + Math.sin(a) * b.r * 0.75, b.r * 0.55, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.fillStyle = '#fff8dc';
+    ctx.beginPath(); ctx.arc(b.x, b.y, b.r * 0.35, 0, Math.PI * 2); ctx.fill();
   }
   ctx.globalAlpha = 1;
   // Grass tufts and tiny night flowers, kept off the path.
@@ -91,16 +165,24 @@ function drawBackground(ctx, game) {
     ctx.lineTo(t.x, t.y - 11 * t.s);
     ctx.stroke();
   }
-  // Drifting fireflies, each with a soft halo so they read as living light.
+  // Drifting fireflies, each with a soft halo and a faint trail so they
+  // read as living light, not static dots.
   for (let i = 0; i < 26; i += 1) {
     const fx = (i * 173 + game.time * (12 + i * 2)) % VIEW.width;
     const fy = HUD_H + 30 + ((i * 97) % (SHOP_Y - HUD_H - 60)) + Math.sin(game.time + i) * 8;
     const fa = 0.5 + 0.3 * Math.sin(game.time * 2 + i * 2);
-    ctx.globalAlpha = fa * 0.25;
+    const tx = (i * 173 + (game.time - 0.35) * (12 + i * 2)) % VIEW.width;
+    ctx.globalAlpha = fa * 0.22;
+    ctx.strokeStyle = '#ffe9a3';
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(tx, fy + Math.sin(game.time - 0.35 + i) * 8); ctx.lineTo(fx, fy); ctx.stroke();
+    ctx.globalAlpha = fa * 0.3;
     ctx.fillStyle = '#ffe9a3';
-    ctx.beginPath(); ctx.arc(fx, fy, 8, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(fx, fy, 9, 0, Math.PI * 2); ctx.fill();
     ctx.globalAlpha = fa;
-    ctx.beginPath(); ctx.arc(fx, fy, 3, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(fx, fy, 3.5, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath(); ctx.arc(fx, fy, 1.4, 0, Math.PI * 2); ctx.fill();
   }
   ctx.globalAlpha = 1;
 }
@@ -108,6 +190,13 @@ function drawBackground(ctx, game) {
 function drawPath(ctx, game) {
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
+  // Dark edge first, so the road has a crisp border against the grass.
+  ctx.strokeStyle = '#2e2118';
+  ctx.lineWidth = 62;
+  ctx.beginPath();
+  ctx.moveTo(PATH[0].x, PATH[0].y);
+  for (let i = 1; i < PATH.length; i += 1) ctx.lineTo(PATH[i].x, PATH[i].y);
+  ctx.stroke();
   // Cobble bed.
   ctx.strokeStyle = '#4a3b2d';
   ctx.lineWidth = 56;
@@ -121,9 +210,18 @@ function drawPath(ctx, game) {
   ctx.moveTo(PATH[0].x, PATH[0].y);
   for (let i = 1; i < PATH.length; i += 1) ctx.lineTo(PATH[i].x, PATH[i].y);
   ctx.stroke();
+  // Worn centre line: a pale dashed thread down the middle of the road.
+  ctx.strokeStyle = 'rgba(255, 235, 190, 0.28)';
+  ctx.lineWidth = 3;
+  ctx.setLineDash([16, 14]);
+  ctx.beginPath();
+  ctx.moveTo(PATH[0].x, PATH[0].y);
+  for (let i = 1; i < PATH.length; i += 1) ctx.lineTo(PATH[i].x, PATH[i].y);
+  ctx.stroke();
+  ctx.setLineDash([]);
   // Cobble stones: seeded dots along the path so the road is not flat mud.
   const stoneRnd = mulberry32(4242);
-  for (let i = 0; i < 48; i += 1) {
+  for (let i = 0; i < 72; i += 1) {
     const p = pointOnPath(stoneRnd() * 2050);
     const px = p.x + (stoneRnd() - 0.5) * 34;
     const py = p.y + (stoneRnd() - 0.5) * 20;
@@ -175,14 +273,20 @@ function drawHeartLantern(ctx, game) {
   // Beacon beam: the Heart Lantern is the lighthouse of the garden.
   const beam = ctx.createLinearGradient(0, HUD_H, 0, HEART.y - 10);
   beam.addColorStop(0, 'rgba(255, 200, 100, 0)');
-  beam.addColorStop(1, 'rgba(255, 200, 100, 0.20)');
+  beam.addColorStop(1, 'rgba(255, 200, 100, 0.28)');
   ctx.fillStyle = beam;
   ctx.beginPath();
-  ctx.moveTo(HEART.x - 26, HEART.y - 10);
-  ctx.lineTo(HEART.x - 8, HUD_H);
-  ctx.lineTo(HEART.x + 8, HUD_H);
-  ctx.lineTo(HEART.x + 26, HEART.y - 10);
+  ctx.moveTo(HEART.x - 30, HEART.y - 10);
+  ctx.lineTo(HEART.x - 10, HUD_H);
+  ctx.lineTo(HEART.x + 10, HUD_H);
+  ctx.lineTo(HEART.x + 30, HEART.y - 10);
   ctx.closePath(); ctx.fill();
+  // Outer halo, then the bright core glow.
+  const halo = ctx.createRadialGradient(HEART.x, HEART.y, 20, HEART.x, HEART.y, 190 * pulse);
+  halo.addColorStop(0, 'rgba(255, 190, 80, 0.22)');
+  halo.addColorStop(1, 'rgba(255, 190, 80, 0)');
+  ctx.fillStyle = halo;
+  ctx.beginPath(); ctx.arc(HEART.x, HEART.y, 190 * pulse, 0, Math.PI * 2); ctx.fill();
   const glow = ctx.createRadialGradient(HEART.x, HEART.y, 4, HEART.x, HEART.y, 120 * pulse);
   glow.addColorStop(0, 'rgba(255, 190, 80, 0.70)');
   glow.addColorStop(1, 'rgba(255, 190, 80, 0)');
@@ -197,8 +301,8 @@ function drawHeartLantern(ctx, game) {
   ctx.beginPath(); ctx.arc(HEART.x, HEART.y - 6, 15 * pulse, 0, Math.PI * 2); ctx.fill();
   ctx.fillStyle = '#fff3c4';
   ctx.beginPath(); ctx.arc(HEART.x, HEART.y - 8, 6, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = '#fff';
-  ctx.font = 'bold 13px sans-serif';
+  ctx.fillStyle = '#ffd76b';
+  ctx.font = 'bold 14px sans-serif';
   ctx.textAlign = 'center';
   // Clamp the label so its last letter never runs off the canvas edge.
   ctx.fillText('HEART LANTERN', Math.min(HEART.x, VIEW.width - 70), HEART.y + 58);
@@ -209,6 +313,12 @@ function drawPlots(ctx, game) {
     const p = PLOTS[i];
     const tower = towerAt(game, i);
     const hover = game.hoverPlot === i && !tower;
+    // Idle breath: empty plots glow faintly in turn, inviting a build.
+    if (!tower && !hover) {
+      const breath = 0.10 + 0.08 * Math.sin(game.time * 1.6 + i * 1.1);
+      ctx.fillStyle = 'rgba(160, 220, 180, ' + breath + ')';
+      ctx.beginPath(); ctx.arc(p.x, p.y, 30, 0, Math.PI * 2); ctx.fill();
+    }
     ctx.beginPath(); ctx.arc(p.x, p.y, 24, 0, Math.PI * 2);
     ctx.fillStyle = hover ? 'rgba(255, 215, 107, 0.35)' : 'rgba(20, 50, 38, 0.85)';
     ctx.fill();
@@ -268,17 +378,25 @@ function drawTowers(ctx, game) {
     const t = game.towers[i];
     const def = TOWERS[t.kind];
     const selected = game.selectedTower === t;
-    // Glow, flickering like a real lantern flame, plus a warm pool of
-    // light on the ground so each lantern owns its patch of garden.
+    // Glow in two layers: a wide soft wash, then a tight bright core,
+    // plus a warm pool of light on the ground so each lantern owns its
+    // patch of garden. The flame flickers like a real lantern.
     const glow = ctx.createRadialGradient(t.x, t.y - 14, 2, t.x, t.y - 14, 62);
     glow.addColorStop(0, def.glow);
     glow.addColorStop(1, 'rgba(0,0,0,0)');
     ctx.globalAlpha = 0.55 + 0.12 * Math.sin(game.time * 3 + i * 1.7);
     ctx.fillStyle = glow;
     ctx.beginPath(); ctx.arc(t.x, t.y - 14, 62, 0, Math.PI * 2); ctx.fill();
-    ctx.globalAlpha = 0.28;
+    const core = ctx.createRadialGradient(t.x, t.y - 14, 1, t.x, t.y - 14, 26);
+    core.addColorStop(0, '#ffffff');
+    core.addColorStop(0.45, def.glow);
+    core.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.globalAlpha = 0.5 + 0.15 * Math.sin(game.time * 5 + i * 2.3);
+    ctx.fillStyle = core;
+    ctx.beginPath(); ctx.arc(t.x, t.y - 14, 26, 0, Math.PI * 2); ctx.fill();
+    ctx.globalAlpha = 0.32;
     ctx.fillStyle = def.glow;
-    ctx.beginPath(); ctx.ellipse(t.x, t.y + 16, 34, 12, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(t.x, t.y + 16, 38, 13, 0, 0, Math.PI * 2); ctx.fill();
     ctx.globalAlpha = 1;
     // Post and base.
     ctx.fillStyle = '#4a3826';
@@ -292,6 +410,10 @@ function drawTowers(ctx, game) {
     ctx.beginPath(); ctx.arc(t.x, t.y - 14, 19, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = '#fff8dc';
     ctx.beginPath(); ctx.arc(t.x, t.y - 15, 9, 0, Math.PI * 2); ctx.fill();
+    // Flame: a bright dot that wobbles inside the glass.
+    const fw = Math.sin(game.time * 7 + i * 3.1) * 2.5;
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath(); ctx.arc(t.x + fw, t.y - 15 + Math.sin(game.time * 9 + i) * 1.5, 3.2, 0, Math.PI * 2); ctx.fill();
     // Aim tick.
     ctx.strokeStyle = def.color;
     ctx.lineWidth = 3;
@@ -331,6 +453,11 @@ function drawEnemies(ctx, game) {
       ctx.save(); ctx.translate(e.x, e.y); ctx.rotate(flap * 0.4);
       ctx.beginPath(); ctx.ellipse(-11, -5, 13, 7.5, -0.5, 0, Math.PI * 2); ctx.fill();
       ctx.beginPath(); ctx.ellipse(11, -5, 13, 7.5, 0.5, 0, Math.PI * 2); ctx.fill();
+      // Rim light: a pale edge so the wings read against the dark grass.
+      ctx.strokeStyle = 'rgba(230, 220, 255, 0.75)';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.ellipse(-11, -5, 13, 7.5, -0.5, 0, Math.PI * 2); ctx.stroke();
+      ctx.beginPath(); ctx.ellipse(11, -5, 13, 7.5, 0.5, 0, Math.PI * 2); ctx.stroke();
       ctx.restore();
       ctx.fillStyle = "#3a2b52";
       ctx.beginPath(); ctx.ellipse(e.x, e.y, 6, 9, 0, 0, Math.PI * 2); ctx.fill();
@@ -338,27 +465,39 @@ function drawEnemies(ctx, game) {
       ctx.beginPath(); ctx.arc(e.x - 3, e.y - 3, 1.8, 0, Math.PI * 2); ctx.fill();
       ctx.beginPath(); ctx.arc(e.x + 3, e.y - 3, 1.8, 0, Math.PI * 2); ctx.fill();
     } else if (e.kind === "wisp") {
-      const glow = ctx.createRadialGradient(e.x, e.y, 1, e.x, e.y, 22);
+      const glow = ctx.createRadialGradient(e.x, e.y, 1, e.x, e.y, 28);
       glow.addColorStop(0, def.color); glow.addColorStop(1, "rgba(0,0,0,0)");
       ctx.fillStyle = glow;
-      ctx.beginPath(); ctx.arc(e.x, e.y, 22, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(e.x, e.y, 28, 0, Math.PI * 2); ctx.fill();
       ctx.fillStyle = "#eafff3";
       ctx.beginPath(); ctx.arc(e.x, e.y, 6, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "#ffffff";
+      ctx.beginPath(); ctx.arc(e.x, e.y, 2.5, 0, Math.PI * 2); ctx.fill();
     } else if (e.kind === "beetle") {
       ctx.fillStyle = def.color;
       ctx.beginPath(); ctx.arc(e.x, e.y, def.radius, 0, Math.PI * 2); ctx.fill();
       ctx.fillStyle = "#7a3b12";
       ctx.beginPath(); ctx.arc(e.x, e.y - 4, def.radius * 0.55, 0, Math.PI * 2); ctx.fill();
+      // Top highlight: a pale arc so the shell has a round, glossy read.
+      ctx.strokeStyle = 'rgba(255, 220, 180, 0.6)';
+      ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.arc(e.x, e.y, def.radius - 3, Math.PI * 1.15, Math.PI * 1.85); ctx.stroke();
       ctx.strokeStyle = "#ffd76b"; ctx.lineWidth = 3;
       ctx.beginPath(); ctx.moveTo(e.x - 6, e.y - def.radius); ctx.lineTo(e.x - 12, e.y - def.radius - 8); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(e.x + 6, e.y - def.radius); ctx.lineTo(e.x + 12, e.y - def.radius - 8); ctx.stroke();
     } else if (e.kind === "boss") {
       // The Moth Queen: wide purple wings, a gold crown, glowing eyes.
+      // Two aura layers: a wide soft wash plus a pulsing ring, so she
+      // dominates the field the moment she arrives.
       const aura = ctx.createRadialGradient(e.x, e.y, 4, e.x, e.y, 72);
       aura.addColorStop(0, "rgba(196, 77, 255, 0.4)");
       aura.addColorStop(1, "rgba(196, 77, 255, 0)");
       ctx.fillStyle = aura;
       ctx.beginPath(); ctx.arc(e.x, e.y, 72, 0, Math.PI * 2); ctx.fill();
+      const ringPulse = 0.35 + 0.25 * Math.sin(game.time * 3);
+      ctx.strokeStyle = "rgba(224, 139, 255, " + ringPulse + ")";
+      ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(e.x, e.y, 58 + Math.sin(game.time * 3) * 4, 0, Math.PI * 2); ctx.stroke();
       const flap = Math.sin(e.wobble * 2) * 0.5;
       ctx.fillStyle = def.color;
       ctx.save(); ctx.translate(e.x, e.y); ctx.rotate(flap * 0.25);
@@ -370,12 +509,15 @@ function drawEnemies(ctx, game) {
       ctx.beginPath(); ctx.ellipse(20, -6, 12, 6, 0.4, 0, Math.PI * 2); ctx.fill();
       ctx.fillStyle = "#2a0a3a";
       ctx.beginPath(); ctx.ellipse(e.x, e.y, 12, 18, 0, 0, Math.PI * 2); ctx.fill();
+      // Crown: taller spikes with a bright core, so the Queen reads as royalty.
+      ctx.fillStyle = "#ffe9a3";
+      ctx.beginPath(); ctx.arc(e.x, e.y - 20, 5, 0, Math.PI * 2); ctx.fill();
       ctx.fillStyle = "#ffd76b";
       for (let s = -1; s <= 1; s += 1) {
         ctx.beginPath();
-        ctx.moveTo(e.x + s * 9 - 5, e.y - 16);
-        ctx.lineTo(e.x + s * 9, e.y - 28);
-        ctx.lineTo(e.x + s * 9 + 5, e.y - 16);
+        ctx.moveTo(e.x + s * 10 - 6, e.y - 15);
+        ctx.lineTo(e.x + s * 10, e.y - 30);
+        ctx.lineTo(e.x + s * 10 + 6, e.y - 15);
         ctx.closePath(); ctx.fill();
       }
       ctx.fillStyle = "#ffe9ec";
@@ -465,11 +607,26 @@ function drawProjectiles(ctx, game) {
 function drawButton(ctx, rect, label, enabled, accent) {
   ctx.beginPath();
   rr(ctx, rect.x, rect.y, rect.w, rect.h, 8);
-  ctx.fillStyle = enabled ? (accent || "#2b6b4f") : "#333d3a";
+  if (enabled) {
+    const bg = ctx.createLinearGradient(0, rect.y, 0, rect.y + rect.h);
+    bg.addColorStop(0, lighten(accent || "#2b6b4f"));
+    bg.addColorStop(1, accent || "#2b6b4f");
+    ctx.fillStyle = bg;
+  } else {
+    ctx.fillStyle = "#333d3a";
+  }
   ctx.fill();
   ctx.strokeStyle = enabled ? "#ffd76b" : "#555";
   ctx.lineWidth = 2;
   ctx.stroke();
+  if (enabled) {
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(rect.x + 10, rect.y + 1.5);
+    ctx.lineTo(rect.x + rect.w - 10, rect.y + 1.5);
+    ctx.stroke();
+  }
   ctx.fillStyle = enabled ? "#fff" : "#999";
   ctx.font = "bold 16px sans-serif";
   ctx.textAlign = "center";
@@ -477,15 +634,35 @@ function drawButton(ctx, rect, label, enabled, accent) {
   ctx.fillText(label, rect.x + rect.w / 2, rect.y + rect.h / 2 + 1);
   ctx.textBaseline = "alphabetic";
 }
+function lighten(hex) {
+  const n = parseInt(hex.slice(1), 16);
+  const r = Math.min(255, ((n >> 16) & 255) + 38);
+  const g = Math.min(255, ((n >> 8) & 255) + 38);
+  const b = Math.min(255, (n & 255) + 38);
+  return 'rgb(' + r + ',' + g + ',' + b + ')';
+}
 
 function drawHUD(ctx, game) {
   const ui = uiLayout(game);
   ctx.fillStyle = "#08131c";
   ctx.fillRect(0, 0, VIEW.width, HUD_H);
+  // Gold divider: a thin bright line under the HUD so the bar reads as
+  // a crafted frame, not a flat slab.
+  const div = ctx.createLinearGradient(0, 0, VIEW.width, 0);
+  div.addColorStop(0, 'rgba(255, 215, 107, 0)');
+  div.addColorStop(0.25, 'rgba(255, 215, 107, 0.85)');
+  div.addColorStop(0.75, 'rgba(255, 215, 107, 0.85)');
+  div.addColorStop(1, 'rgba(255, 215, 107, 0)');
+  ctx.fillStyle = div;
+  ctx.fillRect(0, HUD_H - 2, VIEW.width, 2);
+  ctx.save();
+  ctx.shadowColor = 'rgba(255, 190, 80, 0.8)';
+  ctx.shadowBlur = 12;
   ctx.fillStyle = "#ffd76b";
   ctx.font = "bold 26px sans-serif";
   ctx.textAlign = "left";
   ctx.fillText("GLOWGARDEN", 20, 40);
+  ctx.restore();
   ctx.font = "bold 17px sans-serif";
   ctx.fillStyle = "#e8f5ee";
   const waveLabel = game.wave >= TOTAL_WAVES ? "Waves done" : "Wave " + Math.min(game.wave + 1, TOTAL_WAVES) + " / " + TOTAL_WAVES;
@@ -628,10 +805,30 @@ function drawShop(ctx, game) {
     ctx.strokeStyle = selected ? "#ffd76b" : (afford ? "#3f7a5c" : "#444");
     ctx.lineWidth = selected ? 3 : 2;
     ctx.stroke();
+    // Top highlight: a thin bright edge so the card reads as beveled.
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.14)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(card.x + 12, card.y + 1.5);
+    ctx.lineTo(card.x + card.w - 12, card.y + 1.5);
+    ctx.stroke();
+    // Mini lantern icon: a glowing glass with a cap, not a plain dot.
+    const ix = card.x + 28, iy = card.y + 30;
+    const icGlow = ctx.createRadialGradient(ix, iy, 1, ix, iy, 20);
+    icGlow.addColorStop(0, def.glow);
+    icGlow.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.globalAlpha = 0.6;
+    ctx.fillStyle = icGlow;
+    ctx.beginPath(); ctx.arc(ix, iy, 20, 0, Math.PI * 2); ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = '#3a2b1c';
+    ctx.beginPath(); ctx.arc(ix, iy - 11, 4, Math.PI, 0); ctx.fill();
     ctx.fillStyle = def.color;
-    ctx.beginPath(); ctx.arc(card.x + 28, card.y + 30, 13, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = "#fff8dc";
-    ctx.beginPath(); ctx.arc(card.x + 28, card.y + 29, 6, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(ix, iy, 12, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#fff8dc';
+    ctx.beginPath(); ctx.arc(ix, iy - 1, 6, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath(); ctx.arc(ix, iy - 1, 2.2, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = afford ? "#fff" : "#888";
     ctx.font = "bold 17px sans-serif";
     ctx.fillText(def.name, card.x + 52, card.y + 28);
@@ -645,13 +842,38 @@ function drawShop(ctx, game) {
   }
 }
 
-function overlay(ctx, title, lines, buttonLabel, buttonRect, accent) {
-  ctx.fillStyle = "rgba(4, 12, 18, 0.70)";
+function overlay(ctx, title, lines, buttonLabel, buttonRect, accent, sparkle, time) {
+  ctx.fillStyle = "rgba(4, 12, 18, 0.62)";
   ctx.fillRect(0, 0, VIEW.width, VIEW.height);
+  // Warm halo behind the title so the headline glows, not just sits.
+  const halo = ctx.createRadialGradient(VIEW.width / 2, 190, 10, VIEW.width / 2, 190, 320);
+  halo.addColorStop(0, 'rgba(255, 190, 90, 0.16)');
+  halo.addColorStop(1, 'rgba(255, 190, 90, 0)');
+  ctx.fillStyle = halo;
+  ctx.fillRect(0, 0, VIEW.width, VIEW.height);
+  // Victory sparkles: twinkling gold stars around the headline.
+  // Seeded positions, time-driven alpha, so seeded shots still replay.
+  if (sparkle) {
+    const spRnd = mulberry32(777);
+    for (let i = 0; i < 26; i += 1) {
+      const sx = 200 + spRnd() * (VIEW.width - 400);
+      const sy = 90 + spRnd() * 220;
+      const sa = 0.35 + 0.45 * Math.abs(Math.sin((time || 0) / 0.7 + i * 1.3));
+      ctx.globalAlpha = sa;
+      ctx.fillStyle = '#ffe9a3';
+      const sr = 1.5 + spRnd() * 2.5;
+      ctx.beginPath(); ctx.arc(sx, sy, sr, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
   ctx.textAlign = "center";
+  ctx.save();
+  ctx.shadowColor = 'rgba(255, 190, 80, 0.9)';
+  ctx.shadowBlur = 22;
   ctx.fillStyle = "#ffd76b";
   ctx.font = "bold 54px sans-serif";
   ctx.fillText(title, VIEW.width / 2, 190);
+  ctx.restore();
   ctx.fillStyle = "#eaf6ee";
   ctx.font = "20px sans-serif";
   for (let i = 0; i < lines.length; i += 1) {
@@ -696,7 +918,7 @@ export function draw(ctx, game) {
       "Rank " + grade + "   -   Time " + clock + "   -   Moths stopped " + game.kills,
       "Score " + game.score + "   -   Gold earned " + game.stats.earned,
       "Lives left " + game.lives + "   -   Lanterns built " + game.stats.placed,
-    ], "PLAY AGAIN", ui.againBtn);
+    ], "PLAY AGAIN", ui.againBtn, "#c77f1a", true, game.time);
   } else if (game.screen === SCREEN.LOSE) {
     overlay(ctx, "THE LIGHT WENT OUT", [
       "The moths reached the Heart Lantern on wave " + Math.min(game.wave + 1, TOTAL_WAVES) + ".",
