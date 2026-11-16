@@ -77,10 +77,10 @@ export const ENEMIES = {
 };
 export const ENEMY_ORDER = ['moth', 'wisp', 'beetle', 'brute', 'boss'];
 
-// Waves 1..10: each entry spawns that many of a kind, spaced by a fixed gap.
-// HP grows 26% a wave. The first six waves are the old curve — the
+// Nights 1..10: each entry spawns that many of a kind, spaced by a fixed gap.
+// HP grows 26% a night. The first six nights are the old curve — the
 // mid-game was already tight, so the ramp lives in the late game: more
-// beetles and brutes from wave 7 on, and the last wave brings the Moth
+// beetles and brutes from night 7 on, and the last night brings the Moth
 // Queen herself (8 lives if she leaks, so a field that cannot focus
 // her down loses on the spot). Splash alone cannot carry the late
 // game — fast wisps slip past slow petals, and brutes soak them.
@@ -103,3 +103,8 @@ export const WAVE_BONUS = (wave) => 30 + wave * 8;
 export const START_GOLD = 170;
 export const START_LIVES = 22;
 export const TOTAL_WAVES = WAVES.length;
+
+// Kill chain: a kill landing within CHAIN_WINDOW seconds of the
+// previous one extends the combo. Every 4 chain pays +1 bonus gold,
+// so a hot streak earns more than the same kills spread out.
+export const CHAIN_WINDOW = 2.5;

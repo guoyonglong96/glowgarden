@@ -1,7 +1,7 @@
 // Rendering: everything the player sees, drawn on one canvas.
 // Layout helpers (uiLayout) are shared with input.js so clicks land
 // exactly on the buttons drawn here.
-import { VIEW, HUD_H, SHOP_Y, PATH, HEART, PLOTS, TOWERS, TOWER_ORDER, ENEMIES, TOTAL_WAVES, MAX_LEVEL, WAVES, HARMONY_RADIUS, HARMONY_BONUS } from './config.js';
+import { VIEW, HUD_H, SHOP_Y, PATH, HEART, PLOTS, TOWERS, TOWER_ORDER, ENEMIES, TOTAL_WAVES, MAX_LEVEL, WAVES, HARMONY_RADIUS, HARMONY_BONUS, CHAIN_WINDOW } from './config.js';
 import { SCREEN, towerAt } from './state.js';
 import { towerStats, hasHarmony, harmonyDamage } from './towers.js';
 import { upgradeCost, sellValue } from './config.js';
@@ -151,6 +151,78 @@ function drawBackground(ctx, game) {
     ctx.beginPath(); ctx.arc(b.x, b.y, b.r * 0.35, 0, Math.PI * 2); ctx.fill();
   }
   ctx.globalAlpha = 1;
+  // The pond: a still blue mirror in the upper garden, with lily pads
+  // and slow ripples, so the big empty rectangle inside the road has a
+  // place to rest the eye. Seeded position, clear of path and plots.
+  ctx.fillStyle = '#16324a';
+  ctx.beginPath(); ctx.ellipse(540, 280, 100, 55, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#1d4a63';
+  ctx.beginPath(); ctx.ellipse(540, 280, 86, 45, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = 'rgba(200, 225, 255, 0.14)';
+  ctx.beginPath(); ctx.ellipse(520, 268, 52, 10, -0.12, 0, Math.PI * 2); ctx.fill();
+  // Ripples: two slow rings, time-driven so seeded shots still replay.
+  for (let i = 0; i < 2; i += 1) {
+    const rr2 = ((game.time * 14 + i * 46) % 92) + 6;
+    ctx.strokeStyle = 'rgba(180, 215, 255, ' + (0.22 * (1 - rr2 / 98)) + ')';
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.ellipse(540, 280, rr2, rr2 * 0.55, 0, 0, Math.PI * 2); ctx.stroke();
+  }
+  // Lily pads: three green discs with a pale centre dot.
+  const pads = [[500, 296, 13], [566, 262, 11], [584, 300, 9]];
+  for (let i = 0; i < pads.length; i += 1) {
+    const p = pads[i];
+    ctx.fillStyle = '#2a7a48';
+    ctx.beginPath(); ctx.arc(p[0], p[1], p[2], 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#7dd7a0';
+    ctx.beginPath(); ctx.arc(p[0], p[1], 2.5, 0, Math.PI * 2); ctx.fill();
+  }
+  // The glowing grove: three night trees in the lower-right garden,
+  // trunks dark, canopies layered green with firefly dots inside, so
+  // the second empty stretch reads as a wood, not a void.
+  const trees = [[820, 450], [950, 430], [880, 520]];
+  for (let i = 0; i < trees.length; i += 1) {
+    const tx = trees[i][0], ty = trees[i][1];
+    ctx.fillStyle = '#3a2b1c';
+    ctx.fillRect(tx - 4, ty - 6, 8, 26);
+    ctx.strokeStyle = '#3a2b1c';
+    ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.moveTo(tx, ty - 2); ctx.lineTo(tx - 12, ty - 22); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(tx, ty - 2); ctx.lineTo(tx + 12, ty - 24); ctx.stroke();
+    ctx.fillStyle = '#1d5c38';
+    ctx.beginPath(); ctx.arc(tx - 12, ty - 22, 20, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(tx + 12, ty - 24, 21, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(tx, ty - 34, 23, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#2a7a48';
+    ctx.beginPath(); ctx.arc(tx - 6, ty - 28, 15, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(tx + 8, ty - 30, 13, 0, Math.PI * 2); ctx.fill();
+    // Rim light on the canopy tops, plus firefly dots that pulse.
+    ctx.strokeStyle = 'rgba(140, 220, 160, 0.55)';
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(tx, ty - 34, 23, Math.PI * 1.1, Math.PI * 1.9); ctx.stroke();
+    for (let f = 0; f < 4; f += 1) {
+      const fa = 0.5 + 0.4 * Math.sin(game.time * 2 + i * 2.1 + f * 1.7);
+      ctx.globalAlpha = fa;
+      ctx.fillStyle = '#ffe9a3';
+      ctx.beginPath(); ctx.arc(tx - 16 + f * 9, ty - 34 + (f % 2) * 10, 2, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+  // A stone lantern in the top-right corner, a quiet garden ornament
+  // with a warm window, so the far corner is not bare dark grass.
+  ctx.fillStyle = '#5a5a52';
+  ctx.fillRect(1168, 152, 24, 8);
+  ctx.fillRect(1174, 128, 12, 24);
+  ctx.fillStyle = '#ffd76b';
+  ctx.fillRect(1176, 132, 8, 12);
+  ctx.fillStyle = '#3a3a34';
+  ctx.beginPath(); ctx.moveTo(1166, 128); ctx.lineTo(1194, 128); ctx.lineTo(1188, 116); ctx.lineTo(1172, 116); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#7a7a6e';
+  ctx.beginPath(); ctx.arc(1180, 112, 5, Math.PI, 0); ctx.fill();
+  const slGlow = ctx.createRadialGradient(1180, 138, 2, 1180, 138, 34);
+  slGlow.addColorStop(0, 'rgba(255, 215, 107, 0.30)');
+  slGlow.addColorStop(1, 'rgba(255, 215, 107, 0)');
+  ctx.fillStyle = slGlow;
+  ctx.beginPath(); ctx.arc(1180, 138, 34, 0, Math.PI * 2); ctx.fill();
   // Grass tufts and tiny night flowers, kept off the path.
   for (let i = 0; i < tufts.length; i += 1) {
     const t = tufts[i];
@@ -281,6 +353,29 @@ function drawHeartLantern(ctx, game) {
   ctx.lineTo(HEART.x + 10, HUD_H);
   ctx.lineTo(HEART.x + 30, HEART.y - 10);
   ctx.closePath(); ctx.fill();
+  // Sweep beam: a slow lighthouse sweep around the Heart Lantern, so
+  // the beacon reads as a living lighthouse, not a static lamp. A
+  // wide translucent wedge, additive, drawn under the towers so it
+  // washes the ground instead of bleaching the play.
+  const sweepAngle = game.time * 0.35;
+  const sweepLen = 520;
+  const sx = HEART.x + Math.cos(sweepAngle) * sweepLen;
+  const sy = HEART.y + Math.sin(sweepAngle) * sweepLen;
+  const perp = sweepAngle + Math.PI / 2;
+  const halfW = 26;
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  const sg = ctx.createLinearGradient(HEART.x, HEART.y, sx, sy);
+  sg.addColorStop(0, 'rgba(255, 200, 100, 0.16)');
+  sg.addColorStop(1, 'rgba(255, 200, 100, 0)');
+  ctx.fillStyle = sg;
+  ctx.beginPath();
+  ctx.moveTo(HEART.x, HEART.y);
+  ctx.lineTo(sx + Math.cos(perp) * halfW, sy + Math.sin(perp) * halfW);
+  ctx.lineTo(sx - Math.cos(perp) * halfW, sy - Math.sin(perp) * halfW);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
   // Outer halo, then the bright core glow.
   const halo = ctx.createRadialGradient(HEART.x, HEART.y, 20, HEART.x, HEART.y, 190 * pulse);
   halo.addColorStop(0, 'rgba(255, 190, 80, 0.22)');
@@ -448,6 +543,13 @@ function drawEnemies(ctx, game) {
     ctx.fillStyle = "rgba(0,0,0,0.35)";
     ctx.beginPath(); ctx.ellipse(e.x, e.y + def.radius * 0.8, def.radius, def.radius * 0.4, 0, 0, Math.PI * 2); ctx.fill();
     if (e.kind === "moth") {
+      // Aura: a soft purple wash under each moth, so the swarm reads
+      // as glowing eyes in the dark instead of grey smudges.
+      const aura = ctx.createRadialGradient(e.x, e.y, 2, e.x, e.y, 34);
+      aura.addColorStop(0, 'rgba(185, 167, 255, 0.30)');
+      aura.addColorStop(1, 'rgba(185, 167, 255, 0)');
+      ctx.fillStyle = aura;
+      ctx.beginPath(); ctx.arc(e.x, e.y, 34, 0, Math.PI * 2); ctx.fill();
       const flap = Math.sin(e.wobble * 2) * 0.5;
       ctx.fillStyle = def.color;
       ctx.save(); ctx.translate(e.x, e.y); ctx.rotate(flap * 0.4);
@@ -604,6 +706,49 @@ function drawProjectiles(ctx, game) {
   ctx.globalAlpha = 1;
 }
 
+function drawMinimap(ctx, game) {
+  // A circular minimap in the empty bottom-right corner: the whole
+  // field scaled into one disc — path, plots, towers in their own
+  // colours, enemies as purple dots, the Heart Lantern as gold.
+  const cx = 1200, cy = 535, r = 50;
+  ctx.save();
+  ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(8, 19, 28, 0.88)';
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(255, 215, 107, 0.55)';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.clip();
+  const s = 0.072;
+  const ox = cx - (VIEW.width * s) / 2;
+  const oy = cy - ((SHOP_Y - HUD_H) * s) / 2;
+  const mx = (x) => ox + x * s;
+  const my = (y) => oy + (y - HUD_H) * s;
+  ctx.strokeStyle = 'rgba(255, 235, 190, 0.7)';
+  ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  ctx.moveTo(mx(PATH[0].x), my(PATH[0].y));
+  for (let i = 1; i < PATH.length; i += 1) ctx.lineTo(mx(PATH[i].x), my(PATH[i].y));
+  ctx.stroke();
+  ctx.fillStyle = 'rgba(160, 220, 180, 0.8)';
+  for (let i = 0; i < PLOTS.length; i += 1) {
+    ctx.beginPath(); ctx.arc(mx(PLOTS[i].x), my(PLOTS[i].y), 2, 0, Math.PI * 2); ctx.fill();
+  }
+  for (let i = 0; i < game.towers.length; i += 1) {
+    const t = game.towers[i];
+    ctx.fillStyle = TOWERS[t.kind].color;
+    ctx.beginPath(); ctx.arc(mx(t.x), my(t.y), 3.5, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.fillStyle = '#c9a7ff';
+  for (let i = 0; i < game.enemies.length; i += 1) {
+    const e = game.enemies[i];
+    ctx.beginPath(); ctx.arc(mx(e.x), my(e.y), 2.5, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.fillStyle = '#ffd76b';
+  ctx.beginPath(); ctx.arc(mx(HEART.x), my(HEART.y), 4, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+}
+
 function drawButton(ctx, rect, label, enabled, accent) {
   ctx.beginPath();
   rr(ctx, rect.x, rect.y, rect.w, rect.h, 8);
@@ -665,7 +810,7 @@ function drawHUD(ctx, game) {
   ctx.restore();
   ctx.font = "bold 17px sans-serif";
   ctx.fillStyle = "#e8f5ee";
-  const waveLabel = game.wave >= TOTAL_WAVES ? "Waves done" : "Wave " + Math.min(game.wave + 1, TOTAL_WAVES) + " / " + TOTAL_WAVES;
+  const waveLabel = game.wave >= TOTAL_WAVES ? "Nights done" : "Night " + Math.min(game.wave + 1, TOTAL_WAVES) + " / " + TOTAL_WAVES;
   ctx.fillText(waveLabel, 250, 40);
   ctx.fillStyle = "#ffd76b";
   ctx.fillText("Gold " + game.gold, 400, 40);
@@ -673,11 +818,19 @@ function drawHUD(ctx, game) {
   ctx.fillText("Lives " + game.lives, 520, 40);
   ctx.fillStyle = "#e8f5ee";
   ctx.fillText("Score " + game.score, 640, 40);
+  // Kill chain: a gold "CHAIN xN" under the Gold readout while the
+  // combo is alive, fading as the window runs out.
+  if (game.chain >= 2) {
+    ctx.globalAlpha = 0.55 + 0.45 * Math.max(0, game.chainTimer / CHAIN_WINDOW);
+    ctx.fillStyle = "#ffd76b";
+    ctx.fillText("CHAIN x" + game.chain, 400, 58);
+    ctx.globalAlpha = 1;
+  }
   if (game.screen === SCREEN.WAVE) {
     const left = game.spawnQueue.length + game.enemies.length;
     ctx.fillStyle = "#9fd8b4";
     ctx.fillText("Moths left " + left, 250, 58);
-    // Wave progress: thin bar just below the HUD, clear of the text.
+    // Night progress: thin bar just below the HUD, clear of the text.
     if (game.waveTotal > 0) {
       const cleared = 1 - left / game.waveTotal;
       ctx.fillStyle = "rgba(0,0,0,0.55)";
@@ -717,7 +870,7 @@ function drawHUD(ctx, game) {
     ctx.fillText("Next: " + parts.join(", "), 250, 58);
   }
   const canStart = game.screen === SCREEN.BUILD && game.wave < TOTAL_WAVES;
-  const startLabel = game.screen === SCREEN.BUILD ? "START WAVE" : (game.wave >= TOTAL_WAVES ? "DONE" : "WAVE " + (game.wave + 1));
+  const startLabel = game.screen === SCREEN.BUILD ? "START NIGHT" : (game.wave >= TOTAL_WAVES ? "DONE" : "NIGHT " + (game.wave + 1));
   drawButton(ctx, ui.startBtn, startLabel, canStart, "#c77f1a");
   drawButton(ctx, ui.speedBtn, game.speed === 1 ? "Speed 1x" : "Speed 2x", true, "#2b6b4f");
   drawButton(ctx, ui.pauseBtn, "II", game.screen === SCREEN.WAVE || game.screen === SCREEN.BUILD, "#2b6b4f");
@@ -762,7 +915,7 @@ function drawShop(ctx, game) {
     ctx.fillText("How to play: click a card, then a glowing plot.", 800, SHOP_Y + 38);
     ctx.fillStyle = "#cfe8d8";
     ctx.font = "15px sans-serif";
-    ctx.fillText("SPACE starts a wave. 1-3 pick lanterns. P pauses.", 800, SHOP_Y + 64);
+    ctx.fillText("SPACE starts a night. 1-3 pick lanterns. P pauses.", 800, SHOP_Y + 64);
     ctx.fillText("Click a built lantern to upgrade or sell it.", 800, SHOP_Y + 88);
   }
   if (game.selectedTower) {
@@ -898,6 +1051,7 @@ export function draw(ctx, game) {
   drawTowers(ctx, game);
   drawEnemies(ctx, game);
   drawProjectiles(ctx, game);
+  drawMinimap(ctx, game);
   ctx.restore();
   drawHUD(ctx, game);
   drawShop(ctx, game);
@@ -906,22 +1060,23 @@ export function draw(ctx, game) {
     overlay(ctx, "GLOWGARDEN", [
       "A lantern-defense game: shadow moths march on the Heart Lantern.",
       "Build Ember, Frost and Bloom lanterns on the glowing plots.",
-      "Stop all 10 waves to win. If 22 hearts leak away, the light goes out.",
+      "Stop all 10 nights to win. If 22 hearts leak away, the light goes out.",
       "Different lanterns standing close harmonize for +15% damage.",
-      "Click a card, then a plot. SPACE starts a wave. 1-3 pick lanterns.",
+      "Kills in quick succession build a chain that pays bonus gold.",
+      "Click a card, then a plot. SPACE starts a night. 1-3 pick lanterns.",
     ], "START THE GARDEN", ui.titleBtn);
   } else if (game.screen === SCREEN.WIN) {
     const grade = game.lives >= 18 ? "S" : game.lives >= 13 ? "A" : game.lives >= 7 ? "B" : "C";
     const clock = Math.floor(game.time / 60) + ":" + String(Math.floor(game.time % 60)).padStart(2, "0");
     overlay(ctx, "THE GARDEN GLOWS!", [
-      "All 10 waves beaten. The Heart Lantern burns bright again.",
+      "All 10 nights survived. The Heart Lantern burns bright again.",
       "Rank " + grade + "   -   Time " + clock + "   -   Moths stopped " + game.kills,
       "Score " + game.score + "   -   Gold earned " + game.stats.earned,
-      "Lives left " + game.lives + "   -   Lanterns built " + game.stats.placed,
+      "Lives left " + game.lives + "   -   Lanterns built " + game.stats.placed + "   -   Best chain x" + game.bestChain,
     ], "PLAY AGAIN", ui.againBtn, "#c77f1a", true, game.time);
   } else if (game.screen === SCREEN.LOSE) {
     overlay(ctx, "THE LIGHT WENT OUT", [
-      "The moths reached the Heart Lantern on wave " + Math.min(game.wave + 1, TOTAL_WAVES) + ".",
+      "The moths reached the Heart Lantern on night " + Math.min(game.wave + 1, TOTAL_WAVES) + ".",
       "Score " + game.score + "   -   Moths stopped " + game.kills + "   -   Gold earned " + game.stats.earned,
       game.wave >= 9
         ? "Tip: the Moth Queen soaks splash — slow her with Frost and focus her down."

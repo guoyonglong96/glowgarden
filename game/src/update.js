@@ -10,6 +10,12 @@ import { sfx } from "./audio.js";
 export function stepGame(game, dt) {
   game.time += dt;
   if (game.shake > 0) game.shake = Math.max(0, game.shake - dt);
+  // The kill chain only lives inside the window: let it lapse and the
+  // combo drops back to zero, so the next kill starts a fresh chain.
+  if (game.chainTimer > 0) {
+    game.chainTimer -= dt;
+    if (game.chainTimer <= 0) game.chain = 0;
+  }
   if (game.screen === SCREEN.WAVE) {
     updateSpawns(game, dt);
     const outcome = updateEnemies(game, dt);

@@ -90,12 +90,18 @@ export function stageShot(name, game, seed) {
     game.score = 320;
     game.kills = 14;
     startWave(game);
-    // Wave 2 is the busy shot: wave 1 only has 6 moths, so the field
-    // fills up properly one wave later. Whatever state the run is in
-    // when the cap hits is still a real mid-game render.
+    // Night 9 is the busy shot: by then the autopilot has filled the
+    // plots, upgraded a few lanterns, and the field is at its fullest
+    // — 51 enemies in the wave, a brute among them, chains firing.
+    // A wave-2 frame only ever shows four towers and a handful of
+    // moths, which reads empty next to a finished garden. The run is
+    // real play from the staged opening (the seed-7 economy wins all
+    // 10 nights), so Night 9 is reached, not faked. The stop waits
+    // until the wave is half-spawned, so the swarm is spread across
+    // the field instead of bunched at the west gate.
     runUntil(game, function (g) {
-      return g.screen === SCREEN.WAVE && g.wave === 1 && g.enemies.length >= 5 && g.time > 6;
-    }, 60);
+      return g.screen === SCREEN.WAVE && g.wave === 8 && g.spawnQueue.length <= 25 && g.enemies.length >= 8;
+    }, 400);
     return;
   }
   if (name === "win") {

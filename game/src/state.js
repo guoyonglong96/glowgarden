@@ -2,7 +2,7 @@
 // changes it lives here (start, waves, gold, lives, win and lose).
 import {
   START_GOLD, START_LIVES, TOTAL_WAVES, WAVES, WAVE_BONUS,
-  PLOTS, ENEMIES,
+  PLOTS, ENEMIES, CHAIN_WINDOW,
 } from './config.js';
 
 export const SCREEN = {
@@ -20,6 +20,12 @@ export function createGame() {
     score: 0,
     kills: 0,
     leaked: 0,
+    // Kill chain: kills landing within CHAIN_WINDOW of the previous
+    // one build a combo that pays bonus gold, so a hot streak is
+    // worth more than the same kills spread out.
+    chain: 0,
+    chainTimer: 0,
+    bestChain: 0,
     towers: [],
     enemies: [],
     projectiles: [],
@@ -57,7 +63,7 @@ export function resetGame(game) {
 export function startRun(game) {
   resetGame(game);
   game.screen = SCREEN.BUILD;
-  game.message = 'Place lanterns, then press SPACE to start Wave 1.';
+  game.message = 'Place lanterns, then press SPACE to start Night 1.';
   game.messageTimer = 6;
 }
 
@@ -90,10 +96,10 @@ export function startWave(game) {
   game.screen = SCREEN.WAVE;
   game.selectedTower = null;
   game.banner = game.wave + 1 >= TOTAL_WAVES
-    ? 'FINAL WAVE — THE MOTH QUEEN'
-    : 'WAVE ' + (game.wave + 1);
+    ? 'FINAL NIGHT — THE MOTH QUEEN'
+    : 'NIGHT ' + (game.wave + 1);
   game.bannerUntil = game.time + 2.0;
-  game.message = 'Wave ' + (game.wave + 1) + ' of ' + TOTAL_WAVES + ' - hold the garden!';
+  game.message = 'Night ' + (game.wave + 1) + ' of ' + TOTAL_WAVES + ' - hold the garden!';
   game.messageTimer = 3;
   return true;
 }
@@ -110,7 +116,7 @@ export function waveCleared(game) {
     return 'win';
   }
   game.screen = SCREEN.BUILD;
-  game.message = 'Wave cleared! Bonus +' + bonus + ' gold. Build, then start Wave ' + (game.wave + 1) + '.';
+  game.message = 'Night cleared! Bonus +' + bonus + ' gold. Build, then start Night ' + (game.wave + 1) + '.';
   game.messageTimer = 5;
   return 'clear';
 }
@@ -131,11 +137,18 @@ export function loseLife(game, enemy) {
 
 export function awardKill(game, enemy) {
   const def = ENEMIES[enemy.kind];
-  game.gold += def.gold;
-  game.score += def.gold * 10;
+  // Chain: a kill inside the window extends the combo, otherwise it
+  // restarts at 1. Every 4 chain pays +1 bonus gold on the kill.
+  game.chain = game.chainTimer > 0 ? game.chain + 1 : 1;
+  game.chainTimer = CHAIN_WINDOW;
+  if (game.chain > game.bestChain) game.bestChain = game.chain;
+  const bonus = Math.floor(game.chain / 4);
+  const gold = def.gold + bonus;
+  game.gold += gold;
+  game.score += def.gold * 10 + game.chain * 2;
   game.kills += 1;
-  game.stats.earned += def.gold;
-  game.floats.push({ x: enemy.x, y: enemy.y - 14, text: '+' + def.gold + ' gold', life: 0.9, color: '#ffd76b' });
+  game.stats.earned += gold;
+  game.floats.push({ x: enemy.x, y: enemy.y - 14, text: '+' + gold + ' gold', life: 0.9, color: '#ffd76b' });
 }
 
 export function setMessage(game, text, seconds) {
