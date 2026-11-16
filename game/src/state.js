@@ -36,6 +36,10 @@ export function createGame() {
     mouse: { x: 0, y: 0 },
     message: '',
     messageTimer: 0,
+    shake: 0,
+    banner: '',
+    bannerUntil: 0,
+    waveTotal: 0,
     stats: { placed: 0, earned: 0 },
     rng: Math.random,
   };
@@ -60,7 +64,7 @@ export function startRun(game) {
 export function buildWaveQueue(game) {
   const def = WAVES[game.wave];
   const queue = [];
-  const kinds = ['moth', 'wisp', 'beetle', 'brute'];
+  const kinds = ['moth', 'wisp', 'beetle', 'brute', 'boss'];
   const pools = {};
   kinds.forEach(function (k) { pools[k] = def[k] || 0; });
   let total = 0;
@@ -80,10 +84,15 @@ export function buildWaveQueue(game) {
 export function startWave(game) {
   if (game.screen !== SCREEN.BUILD || game.wave >= TOTAL_WAVES) return false;
   game.spawnQueue = buildWaveQueue(game);
+  game.waveTotal = game.spawnQueue.length;
   game.spawnTimer = 0.5;
   game.waveActive = true;
   game.screen = SCREEN.WAVE;
   game.selectedTower = null;
+  game.banner = game.wave + 1 >= TOTAL_WAVES
+    ? 'FINAL WAVE — THE MOTH QUEEN'
+    : 'WAVE ' + (game.wave + 1);
+  game.bannerUntil = game.time + 2.0;
   game.message = 'Wave ' + (game.wave + 1) + ' of ' + TOTAL_WAVES + ' - hold the garden!';
   game.messageTimer = 3;
   return true;
@@ -110,6 +119,7 @@ export function loseLife(game, enemy) {
   const def = ENEMIES[enemy.kind];
   game.lives -= def.lives;
   game.leaked += 1;
+  game.shake = 0.35;
   game.floats.push({ x: enemy.x, y: enemy.y - 20, text: '-' + def.lives + ' heart', life: 1.2, color: '#ff5d73' });
   if (game.lives <= 0) {
     game.lives = 0;

@@ -1,7 +1,7 @@
 // Enemies: the path they walk, how they spawn, how they move, and what
 // happens when one reaches the Heart Lantern.
 import { PATH, ENEMIES, HP_GROWTH, WAVE_GAP } from './config.js';
-import { loseLife, awardKill } from './state.js';
+import { loseLife, awardKill, setMessage } from './state.js';
 import { sfx } from './audio.js';
 
 // Precomputed path segments with their lengths.
@@ -37,6 +37,19 @@ export function spawnEnemy(game, kind) {
     kind: kind, hp: hp, maxHp: hp, dist: 0, x: p.x, y: p.y,
     slowUntil: 0, slowFactor: 1, wobble: game.rng() * Math.PI * 2,
     hitFlash: 0, dead: false,
+  });
+  if (kind === 'boss') {
+    sfx.boss();
+    setMessage(game, 'The Moth Queen has entered the garden!', 3);
+    ringBurst(game, p.x + 30, p.y, def.color, 26);
+  }
+}
+
+// An expanding shockwave ring: the kill pop for brutes and the boss.
+export function ringBurst(game, x, y, color, size) {
+  game.particles.push({
+    x: x, y: y, vx: 0, vy: 0, life: 0.55, maxLife: 0.55,
+    color: color, size: 6, ring: true, ringMax: size || 60,
   });
 }
 
@@ -81,13 +94,16 @@ export function updateEnemies(game, dt) {
 }
 
 export function burst(game, x, y, color, count) {
+  // Particles are pure decoration: they draw from Math.random, never
+  // from game.rng, so changing an effect can never change the
+  // simulation (a burst-count tweak once swung a run by 4 lives).
   for (let i = 0; i < count; i += 1) {
-    const a = game.rng() * Math.PI * 2;
-    const sp = 40 + game.rng() * 120;
+    const a = Math.random() * Math.PI * 2;
+    const sp = 40 + Math.random() * 120;
     game.particles.push({
       x: x, y: y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
-      life: 0.5 + game.rng() * 0.4, maxLife: 0.9, color: color,
-      size: 2 + game.rng() * 3,
+      life: 0.5 + Math.random() * 0.4, maxLife: 0.9, color: color,
+      size: 2 + Math.random() * 3,
     });
   }
 }
@@ -104,7 +120,9 @@ export function damageEnemy(game, enemy, amount, source) {
     enemy.dead = true;
     awardKill(game, enemy);
     sfx.kill();
-    burst(game, enemy.x, enemy.y, ENEMIES[enemy.kind].color, 16);
-    burst(game, enemy.x, enemy.y, '#ffd76b', 6);
+    const big = enemy.kind === 'brute' || enemy.kind === 'boss';
+    burst(game, enemy.x, enemy.y, ENEMIES[enemy.kind].color, big ? 26 : 16);
+    burst(game, enemy.x, enemy.y, '#ffd76b', big ? 12 : 6);
+    if (big) ringBurst(game, enemy.x, enemy.y, ENEMIES[enemy.kind].color, enemy.kind === 'boss' ? 110 : 70);
   }
 }

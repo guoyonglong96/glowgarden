@@ -28,7 +28,7 @@ export const PLOTS = [
 // speed, colour, and the special effect each one brings.
 // Balance: no one tower wins alone. Ember is the cheap workhorse, Frost
 // trades raw damage for its slow, Bloom pays for splash against packs.
-// DPS per gold: ember 0.23, frost 0.15 (+slow), bloom 0.14 (+splash).
+// DPS per gold: ember 0.23, frost 0.15 (+slow), bloom 0.12 (+splash).
 export const TOWERS = {
   ember: {
     key: '1', name: 'Ember Lantern', cost: 60, range: 120, damage: 7,
@@ -42,10 +42,10 @@ export const TOWERS = {
     slow: 0.62, slowTime: 1.8,
   },
   bloom: {
-    key: '3', name: 'Bloom Lantern', cost: 140, range: 105, damage: 20,
+    key: '3', name: 'Bloom Lantern', cost: 140, range: 105, damage: 18,
     interval: 1.05, projSpeed: 380, color: '#ff7ad9', glow: '#e14bb8',
     blurb: 'Petal splash', desc: 'Splash petals hit a crowd.',
-    splash: 60,
+    splash: 55,
   },
 };
 export const TOWER_ORDER = ['ember', 'frost', 'bloom'];
@@ -72,15 +72,18 @@ export const ENEMIES = {
   moth:   { hp: 30,  speed: 70, gold: 5,  lives: 1, radius: 15, color: '#b9a7ff', name: 'Dusk Moth' },
   wisp:   { hp: 18,  speed: 120, gold: 7, lives: 1, radius: 12, color: '#8ef7c1', name: 'Quick Wisp' },
   beetle: { hp: 115, speed: 50, gold: 13, lives: 2, radius: 19, color: '#ff9d6b', name: 'Horn Beetle' },
-  brute:  { hp: 400, speed: 40, gold: 45, lives: 5, radius: 26, color: '#ff5d73', name: 'Night Brute' },
+  brute:  { hp: 285, speed: 46, gold: 45, lives: 5, radius: 26, color: '#ff5d73', name: 'Night Brute' },
+  boss:   { hp: 380, speed: 38, gold: 120, lives: 8, radius: 30, color: '#c44dff', name: 'Moth Queen' },
 };
-export const ENEMY_ORDER = ['moth', 'wisp', 'beetle', 'brute'];
+export const ENEMY_ORDER = ['moth', 'wisp', 'beetle', 'brute', 'boss'];
 
 // Waves 1..10: each entry spawns that many of a kind, spaced by a fixed gap.
-// HP grows 26% a wave; the last wave brings three Night Brutes.
-// The curve ramps instead of cliffing: beetles arrive one wave at a
-// time in small numbers first, and the late waves are dense enough
-// that a full field of one tower kind still leaks.
+// HP grows 26% a wave. The first six waves are the old curve — the
+// mid-game was already tight, so the ramp lives in the late game: more
+// beetles and brutes from wave 7 on, and the last wave brings the Moth
+// Queen herself (8 lives if she leaks, so a field that cannot focus
+// her down loses on the spot). Splash alone cannot carry the late
+// game — fast wisps slip past slow petals, and brutes soak them.
 export const WAVES = [
   { moth: 6 },
   { moth: 9, wisp: 4 },
@@ -88,15 +91,15 @@ export const WAVES = [
   { moth: 12, wisp: 8, beetle: 3 },
   { moth: 14, wisp: 10, beetle: 5 },
   { wisp: 16, beetle: 8 },
-  { moth: 16, wisp: 12, beetle: 10 },
-  { beetle: 14, wisp: 14, moth: 10 },
-  { beetle: 16, wisp: 20, moth: 12 },
-  { beetle: 12, wisp: 14, brute: 3, moth: 10 },
+  { moth: 16, wisp: 12, beetle: 11 },
+  { beetle: 14, wisp: 16, moth: 10, brute: 1 },
+  { beetle: 16, wisp: 22, moth: 12, brute: 1 },
+  { beetle: 13, wisp: 14, brute: 2, boss: 1, moth: 10 },
 ];
 export const WAVE_GAP = 0.75;          // seconds between spawns in a wave
 export const HP_GROWTH = 0.26;        // +26% HP per wave after the first
 export const WAVE_BONUS = (wave) => 30 + wave * 8;
 
 export const START_GOLD = 170;
-export const START_LIVES = 20;
+export const START_LIVES = 22;
 export const TOTAL_WAVES = WAVES.length;

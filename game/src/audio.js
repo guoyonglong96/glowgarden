@@ -47,4 +47,5 @@ export const sfx = {
   waveClear() { tone(659, 0.12, 'sine', 0.09); tone(880, 0.2, 'sine', 0.09); },
   win() { [523, 659, 784, 1047].forEach(function (f, i) { setTimeout(function () { tone(f, 0.25, 'sine', 0.1); }, i * 140); }); },
   lose() { [400, 350, 300, 200].forEach(function (f, i) { setTimeout(function () { tone(f, 0.3, 'sawtooth', 0.07); }, i * 170); }); },
+  boss() { tone(110, 0.7, 'sawtooth', 0.12, 55); tone(220, 0.5, 'square', 0.06, 110); },
 };

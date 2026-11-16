@@ -17,6 +17,8 @@ export function updateProjectiles(game, dt) {
     }
     p.x += (dx / d) * step;
     p.y += (dy / d) * step;
+    p.px = p.x - (dx / d) * step * 2.2;
+    p.py = p.y - (dy / d) * step * 2.2;
   }
 }
 
@@ -30,10 +32,10 @@ function hitTarget(game, p) {
       const d = Math.hypot(e.x - target.x, e.y - target.y);
       if (d <= p.splash) damageEnemy(game, e, p.damage, p);
     }
-    burst(game, target.x, target.y, '#ff7ad9', 10);
+    burst(game, target.x, target.y, '#ff7ad9', 14);
   } else {
     damageEnemy(game, target, p.damage, p);
-    burst(game, target.x, target.y, p.color, 5);
+    burst(game, target.x, target.y, p.color, 8);
   }
 }
 
@@ -42,6 +44,12 @@ export function updateParticles(game, dt) {
     const pt = game.particles[i];
     pt.life -= dt;
     if (pt.life <= 0) { game.particles.splice(i, 1); continue; }
+    if (pt.ring) {
+      // Shockwave rings expand instead of drifting.
+      const t = 1 - pt.life / pt.maxLife;
+      pt.size = 6 + (pt.ringMax || 60) * t;
+      continue;
+    }
     pt.x += pt.vx * dt; pt.y += pt.vy * dt;
     pt.vx *= 0.96; pt.vy *= 0.96;
   }

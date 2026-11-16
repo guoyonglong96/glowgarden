@@ -111,7 +111,8 @@ export function updateTowers(game, dt) {
     tower.flash = 0.12;
     const base = TOWERS[tower.kind];
     game.projectiles.push({
-      x: tower.x, y: tower.y - 14, target: target, kind: tower.kind,
+      x: tower.x, y: tower.y - 14, px: tower.x, py: tower.y - 14,
+      target: target, kind: tower.kind,
       damage: harmonyDamage(game, tower, stats.damage), speed: base.projSpeed,
       splash: stats.splash, slow: stats.slow,
       slowTime: stats.slowTime, color: base.color,

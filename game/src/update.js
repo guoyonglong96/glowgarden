@@ -9,6 +9,7 @@ import { sfx } from "./audio.js";
 
 export function stepGame(game, dt) {
   game.time += dt;
+  if (game.shake > 0) game.shake = Math.max(0, game.shake - dt);
   if (game.screen === SCREEN.WAVE) {
     updateSpawns(game, dt);
     const outcome = updateEnemies(game, dt);

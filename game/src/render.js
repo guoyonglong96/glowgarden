@@ -95,7 +95,7 @@ function drawBackground(ctx, game) {
   ctx.globalAlpha = 1;
 }
 
-function drawPath(ctx) {
+function drawPath(ctx, game) {
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
   // Cobble bed.
@@ -125,6 +125,15 @@ function drawPath(ctx) {
     ctx.moveTo(8, 0); ctx.lineTo(-6, -8); ctx.lineTo(-6, 8); ctx.closePath();
     ctx.fill();
     ctx.restore();
+  }
+  // West gate: a pulsing violet glow while a wave is still spawning.
+  if (game && game.waveActive && game.spawnQueue.length > 0) {
+    const pulse = 0.3 + 0.2 * Math.sin(game.time * 4);
+    const gate = ctx.createRadialGradient(8, 150, 2, 8, 150, 46);
+    gate.addColorStop(0, 'rgba(185, 167, 255, ' + pulse + ')');
+    gate.addColorStop(1, 'rgba(185, 167, 255, 0)');
+    ctx.fillStyle = gate;
+    ctx.beginPath(); ctx.arc(8, 150, 46, 0, Math.PI * 2); ctx.fill();
   }
 }
 
@@ -229,11 +238,11 @@ function drawTowers(ctx, game) {
     const t = game.towers[i];
     const def = TOWERS[t.kind];
     const selected = game.selectedTower === t;
-    // Glow.
+    // Glow, flickering like a real lantern flame.
     const glow = ctx.createRadialGradient(t.x, t.y - 14, 2, t.x, t.y - 14, 46);
     glow.addColorStop(0, def.glow);
     glow.addColorStop(1, 'rgba(0,0,0,0)');
-    ctx.globalAlpha = 0.5;
+    ctx.globalAlpha = 0.42 + 0.12 * Math.sin(game.time * 3 + i * 1.7);
     ctx.fillStyle = glow;
     ctx.beginPath(); ctx.arc(t.x, t.y - 14, 46, 0, Math.PI * 2); ctx.fill();
     ctx.globalAlpha = 1;
@@ -302,6 +311,30 @@ function drawEnemies(ctx, game) {
       ctx.strokeStyle = "#ffd76b"; ctx.lineWidth = 3;
       ctx.beginPath(); ctx.moveTo(e.x - 6, e.y - def.radius); ctx.lineTo(e.x - 12, e.y - def.radius - 8); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(e.x + 6, e.y - def.radius); ctx.lineTo(e.x + 12, e.y - def.radius - 8); ctx.stroke();
+    } else if (e.kind === "boss") {
+      // The Moth Queen: wide purple wings, a gold crown, glowing eyes.
+      const flap = Math.sin(e.wobble * 2) * 0.5;
+      ctx.fillStyle = def.color;
+      ctx.save(); ctx.translate(e.x, e.y); ctx.rotate(flap * 0.25);
+      ctx.beginPath(); ctx.ellipse(-20, -6, 22, 12, -0.4, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(20, -6, 22, 12, 0.4, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+      ctx.fillStyle = "#7a1fa2";
+      ctx.beginPath(); ctx.ellipse(-20, -6, 12, 6, -0.4, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(20, -6, 12, 6, 0.4, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "#2a0a3a";
+      ctx.beginPath(); ctx.ellipse(e.x, e.y, 12, 18, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "#ffd76b";
+      for (let s = -1; s <= 1; s += 1) {
+        ctx.beginPath();
+        ctx.moveTo(e.x + s * 9 - 5, e.y - 16);
+        ctx.lineTo(e.x + s * 9, e.y - 28);
+        ctx.lineTo(e.x + s * 9 + 5, e.y - 16);
+        ctx.closePath(); ctx.fill();
+      }
+      ctx.fillStyle = "#ffe9ec";
+      ctx.beginPath(); ctx.arc(e.x - 5, e.y - 4, 3, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(e.x + 5, e.y - 4, 3, 0, Math.PI * 2); ctx.fill();
     } else {
       ctx.fillStyle = def.color;
       ctx.beginPath(); ctx.arc(e.x, e.y, def.radius, 0, Math.PI * 2); ctx.fill();
@@ -329,10 +362,11 @@ function drawEnemies(ctx, game) {
       ctx.beginPath(); ctx.arc(e.x, e.y, def.radius + 4, 0, Math.PI * 2); ctx.stroke();
     }
     if (e.hp < e.maxHp) {
-      const w = def.radius * 2;
+      const w = e.kind === "boss" ? def.radius * 2.6 : def.radius * 2;
+      const barColor = e.kind === "boss" ? "#e08bff" : "#7CFC98";
       ctx.fillStyle = "rgba(0,0,0,0.6)";
       ctx.fillRect(e.x - w / 2, e.y - def.radius - 12, w, 5);
-      ctx.fillStyle = "#7CFC98";
+      ctx.fillStyle = barColor;
       ctx.fillRect(e.x - w / 2, e.y - def.radius - 12, w * Math.max(0, e.hp / e.maxHp), 5);
     }
   }
@@ -341,6 +375,14 @@ function drawEnemies(ctx, game) {
 function drawProjectiles(ctx, game) {
   for (let i = 0; i < game.projectiles.length; i += 1) {
     const p = game.projectiles[i];
+    // Motion trail: a short streak behind the shot.
+    if (p.px !== undefined && (p.px !== p.x || p.py !== p.y)) {
+      ctx.strokeStyle = p.color;
+      ctx.globalAlpha = 0.55;
+      ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(p.px, p.py); ctx.lineTo(p.x, p.y); ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
     const glow = ctx.createRadialGradient(p.x, p.y, 1, p.x, p.y, 10);
     glow.addColorStop(0, "#ffffff"); glow.addColorStop(0.4, p.color); glow.addColorStop(1, "rgba(0,0,0,0)");
     ctx.fillStyle = glow;
@@ -349,6 +391,12 @@ function drawProjectiles(ctx, game) {
   for (let i = 0; i < game.particles.length; i += 1) {
     const pt = game.particles[i];
     ctx.globalAlpha = Math.max(0, pt.life / pt.maxLife);
+    if (pt.ring) {
+      ctx.strokeStyle = pt.color;
+      ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(pt.x, pt.y, pt.size, 0, Math.PI * 2); ctx.stroke();
+      continue;
+    }
     ctx.fillStyle = pt.color;
     ctx.beginPath(); ctx.arc(pt.x, pt.y, pt.size, 0, Math.PI * 2); ctx.fill();
   }
@@ -406,6 +454,32 @@ function drawHUD(ctx, game) {
     const left = game.spawnQueue.length + game.enemies.length;
     ctx.fillStyle = "#9fd8b4";
     ctx.fillText("Moths left " + left, 250, 58);
+    // Wave progress: thin bar just below the HUD, clear of the text.
+    if (game.waveTotal > 0) {
+      const cleared = 1 - left / game.waveTotal;
+      ctx.fillStyle = "rgba(0,0,0,0.55)";
+      ctx.fillRect(250, HUD_H + 4, 220, 5);
+      ctx.fillStyle = "#7CFC98";
+      ctx.fillRect(250, HUD_H + 4, 220 * Math.max(0, Math.min(1, cleared)), 5);
+    }
+    // Boss health bar, centred under the HUD and below the message
+    // pill (which sits at HUD_H+8), so the two never overlap.
+    const boss = game.enemies.find((e) => e.kind === "boss" && !e.dead);
+    if (boss) {
+      const bw = 420, bx = (VIEW.width - bw) / 2, by = HUD_H + 48;
+      ctx.fillStyle = "rgba(8, 19, 28, 0.85)";
+      rr(ctx, bx - 10, by - 4, bw + 20, 30, 8);
+      ctx.fill();
+      ctx.fillStyle = "#e08bff";
+      ctx.font = "bold 13px sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("MOTH QUEEN", VIEW.width / 2, by + 10);
+      ctx.fillStyle = "rgba(0,0,0,0.6)";
+      ctx.fillRect(bx, by + 14, bw, 7);
+      ctx.fillStyle = "#c44dff";
+      ctx.fillRect(bx, by + 14, bw * Math.max(0, boss.hp / boss.maxHp), 7);
+      ctx.textAlign = "left";
+    }
   }
   if (game.screen === SCREEN.BUILD && game.wave < TOTAL_WAVES) {
     // Next-wave preview, so the build choice is an informed one.
@@ -415,6 +489,7 @@ function drawHUD(ctx, game) {
     if (def.wisp) parts.push(def.wisp + " wisps");
     if (def.beetle) parts.push(def.beetle + " beetles");
     if (def.brute) parts.push(def.brute + " brutes");
+    if (def.boss) parts.push(def.boss + " Moth Queen");
     ctx.fillStyle = "#9fd8b4";
     ctx.fillText("Next: " + parts.join(", "), 250, 58);
   }
@@ -433,6 +508,16 @@ function drawHUD(ctx, game) {
     ctx.fillStyle = "#ffe9a3";
     ctx.textAlign = "center";
     ctx.fillText(game.message, VIEW.width / 2, HUD_H + 30);
+    ctx.textAlign = "left";
+  }
+  // Wave banner: big centre text for the first two seconds of a wave.
+  if (game.banner && game.time < game.bannerUntil) {
+    ctx.globalAlpha = Math.min(1, (game.bannerUntil - game.time) / 0.6);
+    ctx.fillStyle = "#ffd76b";
+    ctx.font = "bold 44px sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText(game.banner, VIEW.width / 2, 300);
+    ctx.globalAlpha = 1;
     ctx.textAlign = "left";
   }
 }
@@ -531,13 +616,21 @@ function overlay(ctx, title, lines, buttonLabel, buttonRect, accent) {
 }
 
 export function draw(ctx, game) {
+  // Screen shake on a leak: deterministic (driven by game.time, so
+  // seeded screenshots still replay the same frame).
+  ctx.save();
+  if (game.shake > 0) {
+    const m = game.shake * 18;
+    ctx.translate(Math.sin(game.time * 61) * m * 0.5, Math.cos(game.time * 53) * m * 0.5);
+  }
   drawBackground(ctx, game);
-  drawPath(ctx);
+  drawPath(ctx, game);
   drawHeartLantern(ctx, game);
   drawPlots(ctx, game);
   drawTowers(ctx, game);
   drawEnemies(ctx, game);
   drawProjectiles(ctx, game);
+  ctx.restore();
   drawHUD(ctx, game);
   drawShop(ctx, game);
   const ui = uiLayout(game);
@@ -545,21 +638,26 @@ export function draw(ctx, game) {
     overlay(ctx, "GLOWGARDEN", [
       "A lantern-defense game: shadow moths march on the Heart Lantern.",
       "Build Ember, Frost and Bloom lanterns on the glowing plots.",
-      "Stop all 10 waves to win. If 20 hearts leak away, the light goes out.",
+      "Stop all 10 waves to win. If 22 hearts leak away, the light goes out.",
       "Different lanterns standing close harmonize for +15% damage.",
       "Click a card, then a plot. SPACE starts a wave. 1-3 pick lanterns.",
     ], "START THE GARDEN", ui.titleBtn);
   } else if (game.screen === SCREEN.WIN) {
+    const grade = game.lives >= 18 ? "S" : game.lives >= 13 ? "A" : game.lives >= 7 ? "B" : "C";
+    const clock = Math.floor(game.time / 60) + ":" + String(Math.floor(game.time % 60)).padStart(2, "0");
     overlay(ctx, "THE GARDEN GLOWS!", [
       "All 10 waves beaten. The Heart Lantern burns bright again.",
-      "Score " + game.score + "   -   Moths stopped " + game.kills + "   -   Gold earned " + game.stats.earned,
+      "Rank " + grade + "   -   Time " + clock + "   -   Moths stopped " + game.kills,
+      "Score " + game.score + "   -   Gold earned " + game.stats.earned,
       "Lives left " + game.lives + "   -   Lanterns built " + game.stats.placed,
     ], "PLAY AGAIN", ui.againBtn);
   } else if (game.screen === SCREEN.LOSE) {
     overlay(ctx, "THE LIGHT WENT OUT", [
       "The moths reached the Heart Lantern on wave " + Math.min(game.wave + 1, TOTAL_WAVES) + ".",
       "Score " + game.score + "   -   Moths stopped " + game.kills + "   -   Gold earned " + game.stats.earned,
-      "Tip: Frost lanterns slow the swarm so Ember lanterns can finish it.",
+      game.wave >= 9
+        ? "Tip: the Moth Queen soaks splash — slow her with Frost and focus her down."
+        : "Tip: Frost lanterns slow the swarm so Ember lanterns can finish it.",
     ], "TRY AGAIN", ui.againBtn);
   } else if (game.screen === SCREEN.PAUSED) {
     overlay(ctx, "PAUSED", [
