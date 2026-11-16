@@ -56,15 +56,22 @@ function rr(ctx, x, y, w, h, r) {
 
 function drawBackground(ctx, game) {
   const g = ctx.createLinearGradient(0, 0, 0, VIEW.height);
-  g.addColorStop(0, '#0a1e2e');
-  g.addColorStop(0.55, '#0e2f26');
-  g.addColorStop(1, '#0b241d');
+  g.addColorStop(0, '#102a3d');
+  g.addColorStop(0.55, '#153b2f');
+  g.addColorStop(1, '#0e2f26');
   ctx.fillStyle = g;
+  ctx.fillRect(0, 0, VIEW.width, VIEW.height);
+  // A soft warm heart in the middle of the garden so the field never
+  // reads as a black hole, even on the darkest wave.
+  const heart = ctx.createRadialGradient(640, 330, 40, 640, 330, 520);
+  heart.addColorStop(0, 'rgba(255, 190, 90, 0.07)');
+  heart.addColorStop(1, 'rgba(255, 190, 90, 0)');
+  ctx.fillStyle = heart;
   ctx.fillRect(0, 0, VIEW.width, VIEW.height);
   // Stars, gently twinkling.
   for (let i = 0; i < stars.length; i += 1) {
     const s = stars[i];
-    const a = 0.35 + 0.35 * Math.sin(game.time * 1.5 + s.tw);
+    const a = 0.45 + 0.4 * Math.sin(game.time * 1.5 + s.tw);
     ctx.globalAlpha = a;
     ctx.fillStyle = '#cfe8ff';
     ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2); ctx.fill();
@@ -73,7 +80,7 @@ function drawBackground(ctx, game) {
   // Grass tufts and tiny night flowers, kept off the path.
   for (let i = 0; i < tufts.length; i += 1) {
     const t = tufts[i];
-    ctx.strokeStyle = t.hue > 0.85 ? '#ff9ecf' : '#2f7a4e';
+    ctx.strokeStyle = t.hue > 0.85 ? '#ff9ecf' : '#3f9c66';
     ctx.lineWidth = 2;
     ctx.beginPath();
     ctx.moveTo(t.x, t.y);
@@ -84,13 +91,16 @@ function drawBackground(ctx, game) {
     ctx.lineTo(t.x, t.y - 11 * t.s);
     ctx.stroke();
   }
-  // Drifting fireflies.
-  for (let i = 0; i < 14; i += 1) {
+  // Drifting fireflies, each with a soft halo so they read as living light.
+  for (let i = 0; i < 26; i += 1) {
     const fx = (i * 173 + game.time * (12 + i * 2)) % VIEW.width;
     const fy = HUD_H + 30 + ((i * 97) % (SHOP_Y - HUD_H - 60)) + Math.sin(game.time + i) * 8;
-    ctx.globalAlpha = 0.5 + 0.3 * Math.sin(game.time * 2 + i * 2);
+    const fa = 0.5 + 0.3 * Math.sin(game.time * 2 + i * 2);
+    ctx.globalAlpha = fa * 0.25;
     ctx.fillStyle = '#ffe9a3';
-    ctx.beginPath(); ctx.arc(fx, fy, 2.5, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(fx, fy, 8, 0, Math.PI * 2); ctx.fill();
+    ctx.globalAlpha = fa;
+    ctx.beginPath(); ctx.arc(fx, fy, 3, 0, Math.PI * 2); ctx.fill();
   }
   ctx.globalAlpha = 1;
 }
@@ -105,14 +115,23 @@ function drawPath(ctx, game) {
   ctx.moveTo(PATH[0].x, PATH[0].y);
   for (let i = 1; i < PATH.length; i += 1) ctx.lineTo(PATH[i].x, PATH[i].y);
   ctx.stroke();
-  ctx.strokeStyle = '#6b563e';
+  ctx.strokeStyle = '#7a6547';
   ctx.lineWidth = 46;
   ctx.beginPath();
   ctx.moveTo(PATH[0].x, PATH[0].y);
   for (let i = 1; i < PATH.length; i += 1) ctx.lineTo(PATH[i].x, PATH[i].y);
   ctx.stroke();
+  // Cobble stones: seeded dots along the path so the road is not flat mud.
+  const stoneRnd = mulberry32(4242);
+  for (let i = 0; i < 48; i += 1) {
+    const p = pointOnPath(stoneRnd() * 2050);
+    const px = p.x + (stoneRnd() - 0.5) * 34;
+    const py = p.y + (stoneRnd() - 0.5) * 20;
+    ctx.fillStyle = stoneRnd() > 0.5 ? 'rgba(0,0,0,0.28)' : 'rgba(255, 240, 200, 0.10)';
+    ctx.beginPath(); ctx.arc(px, py, 2 + stoneRnd() * 2, 0, Math.PI * 2); ctx.fill();
+  }
   // Direction chevrons along the path.
-  ctx.fillStyle = 'rgba(255, 215, 107, 0.5)';
+  ctx.fillStyle = 'rgba(255, 215, 107, 0.65)';
   const chevrons = [120, 420, 700, 980, 1250, 1520, 1790, 2050];
   for (let i = 0; i < chevrons.length; i += 1) {
     const d = chevrons[i];
@@ -153,20 +172,31 @@ function pointOnPath(dist) {
 
 function drawHeartLantern(ctx, game) {
   const pulse = 1 + 0.06 * Math.sin(game.time * 2.4);
-  const glow = ctx.createRadialGradient(HEART.x, HEART.y, 4, HEART.x, HEART.y, 90 * pulse);
-  glow.addColorStop(0, 'rgba(255, 190, 80, 0.55)');
+  // Beacon beam: the Heart Lantern is the lighthouse of the garden.
+  const beam = ctx.createLinearGradient(0, HUD_H, 0, HEART.y - 10);
+  beam.addColorStop(0, 'rgba(255, 200, 100, 0)');
+  beam.addColorStop(1, 'rgba(255, 200, 100, 0.20)');
+  ctx.fillStyle = beam;
+  ctx.beginPath();
+  ctx.moveTo(HEART.x - 26, HEART.y - 10);
+  ctx.lineTo(HEART.x - 8, HUD_H);
+  ctx.lineTo(HEART.x + 8, HUD_H);
+  ctx.lineTo(HEART.x + 26, HEART.y - 10);
+  ctx.closePath(); ctx.fill();
+  const glow = ctx.createRadialGradient(HEART.x, HEART.y, 4, HEART.x, HEART.y, 120 * pulse);
+  glow.addColorStop(0, 'rgba(255, 190, 80, 0.70)');
   glow.addColorStop(1, 'rgba(255, 190, 80, 0)');
   ctx.fillStyle = glow;
-  ctx.beginPath(); ctx.arc(HEART.x, HEART.y, 90 * pulse, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(HEART.x, HEART.y, 120 * pulse, 0, Math.PI * 2); ctx.fill();
   // Post and lamp.
   ctx.fillStyle = '#5a4632';
-  ctx.fillRect(HEART.x - 5, HEART.y + 6, 10, 34);
+  ctx.fillRect(HEART.x - 6, HEART.y + 6, 12, 34);
   ctx.fillStyle = '#ffd76b';
-  ctx.beginPath(); ctx.arc(HEART.x, HEART.y - 6, 20 * pulse, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(HEART.x, HEART.y - 6, 24 * pulse, 0, Math.PI * 2); ctx.fill();
   ctx.fillStyle = '#ff9d2e';
-  ctx.beginPath(); ctx.arc(HEART.x, HEART.y - 6, 12 * pulse, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(HEART.x, HEART.y - 6, 15 * pulse, 0, Math.PI * 2); ctx.fill();
   ctx.fillStyle = '#fff3c4';
-  ctx.beginPath(); ctx.arc(HEART.x, HEART.y - 8, 5, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(HEART.x, HEART.y - 8, 6, 0, Math.PI * 2); ctx.fill();
   ctx.fillStyle = '#fff';
   ctx.font = 'bold 13px sans-serif';
   ctx.textAlign = 'center';
@@ -183,7 +213,7 @@ function drawPlots(ctx, game) {
     ctx.fillStyle = hover ? 'rgba(255, 215, 107, 0.35)' : 'rgba(20, 50, 38, 0.85)';
     ctx.fill();
     ctx.lineWidth = hover ? 3 : 2;
-    ctx.strokeStyle = hover ? '#ffd76b' : 'rgba(160, 220, 180, 0.55)';
+    ctx.strokeStyle = hover ? '#ffd76b' : 'rgba(160, 220, 180, 0.70)';
     ctx.stroke();
     if (!tower) {
       ctx.strokeStyle = 'rgba(220, 255, 230, 0.7)';
@@ -196,8 +226,8 @@ function drawPlots(ctx, game) {
   }
   // Harmony links: a gold thread between different-kind towers
   // standing close enough to harmonize, so the bonus is visible.
-  ctx.strokeStyle = 'rgba(255, 215, 107, 0.5)';
-  ctx.lineWidth = 2.5;
+  ctx.strokeStyle = 'rgba(255, 215, 107, 0.65)';
+  ctx.lineWidth = 3;
   for (let i = 0; i < game.towers.length; i += 1) {
     for (let j = i + 1; j < game.towers.length; j += 1) {
       const a = game.towers[i], b = game.towers[j];
@@ -238,43 +268,51 @@ function drawTowers(ctx, game) {
     const t = game.towers[i];
     const def = TOWERS[t.kind];
     const selected = game.selectedTower === t;
-    // Glow, flickering like a real lantern flame.
-    const glow = ctx.createRadialGradient(t.x, t.y - 14, 2, t.x, t.y - 14, 46);
+    // Glow, flickering like a real lantern flame, plus a warm pool of
+    // light on the ground so each lantern owns its patch of garden.
+    const glow = ctx.createRadialGradient(t.x, t.y - 14, 2, t.x, t.y - 14, 62);
     glow.addColorStop(0, def.glow);
     glow.addColorStop(1, 'rgba(0,0,0,0)');
-    ctx.globalAlpha = 0.42 + 0.12 * Math.sin(game.time * 3 + i * 1.7);
+    ctx.globalAlpha = 0.55 + 0.12 * Math.sin(game.time * 3 + i * 1.7);
     ctx.fillStyle = glow;
-    ctx.beginPath(); ctx.arc(t.x, t.y - 14, 46, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(t.x, t.y - 14, 62, 0, Math.PI * 2); ctx.fill();
+    ctx.globalAlpha = 0.28;
+    ctx.fillStyle = def.glow;
+    ctx.beginPath(); ctx.ellipse(t.x, t.y + 16, 34, 12, 0, 0, Math.PI * 2); ctx.fill();
     ctx.globalAlpha = 1;
-    // Post.
+    // Post and base.
     ctx.fillStyle = '#4a3826';
     ctx.fillRect(t.x - 4, t.y - 6, 8, 22);
-    // Lamp body.
+    ctx.fillRect(t.x - 10, t.y + 14, 20, 5);
+    // Lamp body: a real lantern, cap on top and bright glass.
+    ctx.fillStyle = '#3a2b1c';
+    ctx.beginPath(); ctx.arc(t.x, t.y - 30, 9, Math.PI, 0); ctx.fill();
+    ctx.fillRect(t.x - 9, t.y - 31, 18, 4);
     ctx.fillStyle = def.color;
-    ctx.beginPath(); ctx.arc(t.x, t.y - 14, 15, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(t.x, t.y - 14, 19, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = '#fff8dc';
-    ctx.beginPath(); ctx.arc(t.x, t.y - 15, 7, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(t.x, t.y - 15, 9, 0, Math.PI * 2); ctx.fill();
     // Aim tick.
     ctx.strokeStyle = def.color;
     ctx.lineWidth = 3;
     ctx.beginPath();
     ctx.moveTo(t.x, t.y - 14);
-    ctx.lineTo(t.x + Math.cos(t.angle) * 20, t.y - 14 + Math.sin(t.angle) * 20);
+    ctx.lineTo(t.x + Math.cos(t.angle) * 24, t.y - 14 + Math.sin(t.angle) * 24);
     ctx.stroke();
     // Level pips.
     for (let l = 0; l < t.level; l += 1) {
       ctx.fillStyle = '#ffd76b';
-      ctx.beginPath(); ctx.arc(t.x - 10 + l * 10, t.y + 22, 3.5, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(t.x - 10 + l * 10, t.y + 22, 4, 0, Math.PI * 2); ctx.fill();
     }
     if (selected) {
       ctx.strokeStyle = '#ffd76b';
       ctx.lineWidth = 3;
-      ctx.beginPath(); ctx.arc(t.x, t.y - 4, 30, 0, Math.PI * 2); ctx.stroke();
+      ctx.beginPath(); ctx.arc(t.x, t.y - 4, 34, 0, Math.PI * 2); ctx.stroke();
     }
     if (t.flash > 0) {
       ctx.globalAlpha = 0.7;
       ctx.fillStyle = '#ffffff';
-      ctx.beginPath(); ctx.arc(t.x + Math.cos(t.angle) * 22, t.y - 14 + Math.sin(t.angle) * 22, 6, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(t.x + Math.cos(t.angle) * 26, t.y - 14 + Math.sin(t.angle) * 26, 6, 0, Math.PI * 2); ctx.fill();
       ctx.globalAlpha = 1;
     }
   }
@@ -291,18 +329,21 @@ function drawEnemies(ctx, game) {
       const flap = Math.sin(e.wobble * 2) * 0.5;
       ctx.fillStyle = def.color;
       ctx.save(); ctx.translate(e.x, e.y); ctx.rotate(flap * 0.4);
-      ctx.beginPath(); ctx.ellipse(-9, -4, 10, 6, -0.5, 0, Math.PI * 2); ctx.fill();
-      ctx.beginPath(); ctx.ellipse(9, -4, 10, 6, 0.5, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(-11, -5, 13, 7.5, -0.5, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(11, -5, 13, 7.5, 0.5, 0, Math.PI * 2); ctx.fill();
       ctx.restore();
       ctx.fillStyle = "#3a2b52";
       ctx.beginPath(); ctx.ellipse(e.x, e.y, 6, 9, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "#ffe9a3";
+      ctx.beginPath(); ctx.arc(e.x - 3, e.y - 3, 1.8, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(e.x + 3, e.y - 3, 1.8, 0, Math.PI * 2); ctx.fill();
     } else if (e.kind === "wisp") {
-      const glow = ctx.createRadialGradient(e.x, e.y, 1, e.x, e.y, 18);
+      const glow = ctx.createRadialGradient(e.x, e.y, 1, e.x, e.y, 22);
       glow.addColorStop(0, def.color); glow.addColorStop(1, "rgba(0,0,0,0)");
       ctx.fillStyle = glow;
-      ctx.beginPath(); ctx.arc(e.x, e.y, 18, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(e.x, e.y, 22, 0, Math.PI * 2); ctx.fill();
       ctx.fillStyle = "#eafff3";
-      ctx.beginPath(); ctx.arc(e.x, e.y, 5, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(e.x, e.y, 6, 0, Math.PI * 2); ctx.fill();
     } else if (e.kind === "beetle") {
       ctx.fillStyle = def.color;
       ctx.beginPath(); ctx.arc(e.x, e.y, def.radius, 0, Math.PI * 2); ctx.fill();
@@ -313,6 +354,11 @@ function drawEnemies(ctx, game) {
       ctx.beginPath(); ctx.moveTo(e.x + 6, e.y - def.radius); ctx.lineTo(e.x + 12, e.y - def.radius - 8); ctx.stroke();
     } else if (e.kind === "boss") {
       // The Moth Queen: wide purple wings, a gold crown, glowing eyes.
+      const aura = ctx.createRadialGradient(e.x, e.y, 4, e.x, e.y, 72);
+      aura.addColorStop(0, "rgba(196, 77, 255, 0.4)");
+      aura.addColorStop(1, "rgba(196, 77, 255, 0)");
+      ctx.fillStyle = aura;
+      ctx.beginPath(); ctx.arc(e.x, e.y, 72, 0, Math.PI * 2); ctx.fill();
       const flap = Math.sin(e.wobble * 2) * 0.5;
       ctx.fillStyle = def.color;
       ctx.save(); ctx.translate(e.x, e.y); ctx.rotate(flap * 0.25);
@@ -348,8 +394,8 @@ function drawEnemies(ctx, game) {
         ctx.fill();
       }
       ctx.fillStyle = "#ffe9ec";
-      ctx.beginPath(); ctx.arc(e.x - 8, e.y - 4, 3, 0, Math.PI * 2); ctx.fill();
-      ctx.beginPath(); ctx.arc(e.x + 8, e.y - 4, 3, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(e.x - 8, e.y - 4, 3.5, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(e.x + 8, e.y - 4, 3.5, 0, Math.PI * 2); ctx.fill();
     }
     if (e.hitFlash > 0) {
       ctx.globalAlpha = 0.6;
@@ -386,7 +432,7 @@ function drawProjectiles(ctx, game) {
     const glow = ctx.createRadialGradient(p.x, p.y, 1, p.x, p.y, 10);
     glow.addColorStop(0, "#ffffff"); glow.addColorStop(0.4, p.color); glow.addColorStop(1, "rgba(0,0,0,0)");
     ctx.fillStyle = glow;
-    ctx.beginPath(); ctx.arc(p.x, p.y, 12, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(p.x, p.y, 14, 0, Math.PI * 2); ctx.fill();
   }
   for (let i = 0; i < game.particles.length; i += 1) {
     const pt = game.particles[i];
@@ -600,7 +646,7 @@ function drawShop(ctx, game) {
 }
 
 function overlay(ctx, title, lines, buttonLabel, buttonRect, accent) {
-  ctx.fillStyle = "rgba(4, 12, 18, 0.78)";
+  ctx.fillStyle = "rgba(4, 12, 18, 0.70)";
   ctx.fillRect(0, 0, VIEW.width, VIEW.height);
   ctx.textAlign = "center";
   ctx.fillStyle = "#ffd76b";
