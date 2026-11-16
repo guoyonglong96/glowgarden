@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:,">
+<title>Glowgarden — Lantern Defense</title>
+<style>
+  html, body { margin: 0; padding: 0; background: #05090d; }
+  body { display: flex; flex-direction: column; align-items: center; }
+  canvas { width: min(1280px, 100vw, calc(100vh * 16 / 9)); height: auto; aspect-ratio: 16 / 9; display: block; }
+  #selftest { color: #9fd8b4; font: 14px monospace; white-space: pre-wrap; padding: 8px; }
+  #selftest:empty { display: none; }
+</style>
+</head>
+<body>
+<canvas id="game" width="1280" height="720"></canvas>
+<div id="selftest"></div>
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>
