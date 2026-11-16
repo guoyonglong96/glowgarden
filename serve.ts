@@ -1,58 +1,62 @@
-// Development-only static server for game/ (Node 22, standard library
-// only): `node serve.ts` serves game/ on http://localhost:8080 so the
-// game can be played and screenshotted in desktop Chrome. It sends the
-// MIME types a browser game needs and refuses any path outside game/.
-import { createReadStream, statSync } from "node:fs";
-import { createServer } from "node:http";
-import { extname, join, normalize, resolve, sep } from "node:path";
-import { fileURLToPath } from "node:url";
+import * as fs from "node:fs";
+import * as http from "node:http";
+import * as path from "node:path";
+import { fileURLToPath as urlToPath } from "node:url";
 
-const root = resolve(fileURLToPath(new URL("./game", import.meta.url)));
-const portArg = process.argv.indexOf("--port");
-const wanted = portArg === -1 ? 8080 : Number(process.argv[portArg + 1]);
-const port = Number.isInteger(wanted) && wanted > 0 && wanted < 65536 ? wanted : 8080;
+const root = path.resolve(urlToPath(new URL("./game", import.meta.url)));
+const portFlag = process.argv.indexOf("--port");
+const requested = portFlag < 0 ? 8080 : Number(process.argv[portFlag + 1]);
+const port = Number.isInteger(requested) && requested > 0 && requested < 65536 ? requested : 8080;
 
-const MIME = {
-  ".html": "text/html; charset=utf-8",
-  ".js": "text/javascript; charset=utf-8",
-  ".mjs": "text/javascript; charset=utf-8",
-  ".css": "text/css; charset=utf-8",
-  ".json": "application/json; charset=utf-8",
-  ".png": "image/png",
-  ".jpg": "image/jpeg",
-  ".jpeg": "image/jpeg",
+const MIME = new Map([
+  [".html", "text/html; charset=utf-8"],
+  [".js", "text/javascript; charset=utf-8"],
+  [".mjs", "text/javascript; charset=utf-8"],
+  [".css", "text/css; charset=utf-8"],
+  [".json", "application/json; charset=utf-8"],
+  [".png", "image/png"],
+  [".jpg", "image/jpeg"],
+  [".jpeg", "image/jpeg"],
+]);
+
+const reply = (response, code, body) => {
+  response.writeHead(code).end(body);
 };
 
-createServer((request, response) => {
-  const url = new URL(request.url ?? "/", "http://localhost");
+const serveFile = (request, response) => {
+  const url = new URL(request.url === null || request.url === undefined ? "/" : request.url, "http://localhost");
   let pathname;
   try {
     pathname = decodeURIComponent(url.pathname);
   } catch {
-    response.writeHead(400).end("bad request");
+    reply(response, 400, "bad request");
     return;
   }
-  if (pathname.endsWith("/")) pathname += "index.html";
-  const file = resolve(join(root, normalize(pathname)));
-  if (file !== root && !file.startsWith(root + sep)) {
-    response.writeHead(403).end("forbidden");
+  if (pathname.charAt(pathname.length - 1) === "/") pathname = `${pathname}index.html`;
+  const file = path.resolve(path.join(root, path.normalize(pathname)));
+  const inside = file === root || file.indexOf(root + path.sep) === 0;
+  if (inside === false) {
+    reply(response, 403, "forbidden");
     return;
   }
   let size;
   try {
-    const stats = statSync(file);
-    if (!stats.isFile()) throw new Error("not a file");
+    const stats = fs.statSync(file);
+    if (stats.isFile() === false) throw new Error("not a file");
     size = stats.size;
   } catch {
-    response.writeHead(404).end("not found");
+    reply(response, 404, "not found");
     return;
   }
+  const type = MIME.get(path.extname(file).toLowerCase());
   response.writeHead(200, {
-    "content-type": MIME[extname(file).toLowerCase()] ?? "application/octet-stream",
+    "content-type": type === undefined ? "application/octet-stream" : type,
     "content-length": size,
     "cache-control": "no-store",
   });
-  createReadStream(file).pipe(response);
-}).listen(port, "127.0.0.1", () => {
-  console.log("game/ is on http://localhost:" + port);
+  fs.createReadStream(file).pipe(response);
+};
+
+http.createServer(serveFile).listen(port, "127.0.0.1", () => {
+  console.log(`game/ is on http://localhost:${port}`);
 });

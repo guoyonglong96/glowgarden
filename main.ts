@@ -1,53 +1,45 @@
-// Glowgarden entrypoint (Node 22, standard library only). The game is
-// the static files under game/ (game/index.html plus its ES modules, no
-// library and no network request). This program hands the entry in: it
-// copies game/ and screenshots/ from beside this file to /output and
-// writes /output/dossier.json, the summary the judge reads, with the
-// vendored make.fun library.
-//
-// Play it locally with `node serve.ts`, then open http://localhost:8080.
-// Outside the grader's container, MAKEFUN_OUTPUT_DIR stands in for /output:
-//   mkdir -p out && MAKEFUN_OUTPUT_DIR=out node main.ts
-
-import { cpSync, existsSync, mkdirSync, readdirSync, statSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
-import { fileURLToPath } from "node:url";
+import * as fs from "node:fs";
+import * as path from "node:path";
+import { fileURLToPath as urlToPath } from "node:url";
 import { buildDossier } from "./vendor/makefun-game.ts";
 
-const here = fileURLToPath(new URL(".", import.meta.url));
-const out = process.env.MAKEFUN_OUTPUT_DIR ?? "/output";
+const rootDir = urlToPath(new URL(".", import.meta.url));
+const destDir = process.env.MAKEFUN_OUTPUT_DIR === undefined
+  ? "/output"
+  : process.env.MAKEFUN_OUTPUT_DIR;
 
-function fail(message) {
-  console.error("main.ts: " + message);
+const die = (message) => {
+  console.error(`main.ts: ${message}`);
   process.exit(1);
-}
+};
 
-// Guardrails that mirror the sealed scorer's caps, so a bad entry fails
-// loudly here instead of silently at grading time.
-const gameDir = join(here, "game");
-const shotsDir = join(here, "screenshots");
-if (!existsSync(join(gameDir, "index.html"))) fail("game/index.html is missing");
-if (!existsSync(shotsDir)) fail("screenshots/ is missing");
-const shots = readdirSync(shotsDir).filter((name) => !name.startsWith("."));
-if (shots.length < 3 || shots.length > 4) fail("need 3 or 4 screenshots, found " + shots.length);
-for (const name of shots) {
-  const bytes = statSync(join(shotsDir, name)).size;
-  if (bytes > 262144) fail("screenshot " + name + " is " + bytes + " bytes, over the 256 KiB cap");
-}
+const must = (ok, message) => {
+  if (ok === false) die(message);
+};
 
-mkdirSync(out, { recursive: true });
-cpSync(gameDir, join(out, "game"), { recursive: true });
-mkdirSync(join(out, "screenshots"), { recursive: true });
-cpSync(shotsDir, join(out, "screenshots"), { recursive: true });
+const gameDir = path.join(rootDir, "game");
+const shotsDir = path.join(rootDir, "screenshots");
+must(fs.existsSync(path.join(gameDir, "index.html")), "game/index.html is missing");
+must(fs.existsSync(shotsDir), "screenshots/ is missing");
 
-writeFileSync(
-  join(out, "dossier.json"),
-  buildDossier(out, {
-    text_max_bytes: 163840,
-    screenshots: { max: 4, max_bytes: 262144 },
-    game_max_files: 993,
-    game_max_bytes: 50331648,
-    game_path_max_bytes: 1000,
-  }),
-);
-console.log("wrote " + out + "/dossier.json (" + shots.length + " screenshots)");
+const shots = fs.readdirSync(shotsDir).filter((name) => name.startsWith(".") === false);
+must(shots.length >= 3 && shots.length <= 4, `need 3 or 4 screenshots, found ${shots.length}`);
+shots.forEach((name) => {
+  const bytes = fs.statSync(path.join(shotsDir, name)).size;
+  if (bytes > 262144) die(`screenshot ${name} is ${bytes} bytes, over the 256 KiB cap`);
+});
+
+fs.mkdirSync(destDir, { recursive: true });
+fs.cpSync(gameDir, path.join(destDir, "game"), { recursive: true });
+fs.mkdirSync(path.join(destDir, "screenshots"), { recursive: true });
+fs.cpSync(shotsDir, path.join(destDir, "screenshots"), { recursive: true });
+
+const dossierOptions = {
+  text_max_bytes: 163840,
+  screenshots: { max: 4, max_bytes: 262144 },
+  game_max_files: 993,
+  game_max_bytes: 50331648,
+  game_path_max_bytes: 1000,
+};
+fs.writeFileSync(path.join(destDir, "dossier.json"), buildDossier(destDir, dossierOptions));
+console.log(`wrote ${destDir}/dossier.json (${shots.length} screenshots)`);
